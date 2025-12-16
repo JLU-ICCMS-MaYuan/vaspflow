@@ -47,3 +47,4 @@
 - 2025-12-15：新增 `pyproject.toml` 与 `setup.cfg` 支持 `pip install -e .`，映射包名 `vasp` 并打包默认模板；`parser_vasp` 在缺少 structuregenerator 时给出可选依赖提示。
 - 2025-12-15：添加 `.gitignore` 并清理已跟踪的 `__pycache__/*.pyc` 等构建/缓存产物，避免再次提交；本地工作目录可保留 `test/` 示例结构自测。
 - 2025-12-15：新增 `vasp_cli_entry.py` 与入口脚本映射 `vasp/vaspflow -> vasp_cli_entry:main`，在运行时强制优先加载当前项目的 `vasp` 包，避免与其他同名包冲突导致 CLI 无法导入 pipelines。
+- 2025-12-15：完善 `config_example.json` 使用说明，指导复制为自定义配置并通过 `--json` 显式加载，明确 CLI 覆盖优先级与示例命令。

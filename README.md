@@ -6,6 +6,17 @@
 - 提交方式：`-j/--job-system` 选 `bash/slurm/pbs/lsf`；`--mpi-procs` 可为数字或完整前缀（如 `mpirun -np 16`、`srun -n 16`），未指定取配置或默认 8。
 - 赝势管理：优先使用当前工作目录下的 `potcar_lib`（支持 `potcar_lib/元素` 或 `potcar_lib/元素/POTCAR`），若缺元素且提供 `potcar_dir` 则仅在 `potcar_dir`（含 `potcar_type` 子目录）中寻找唯一候选并复制到 `potcar_lib`。若找不到或候选不唯一会报错，请手动将所需 POTCAR 放入 `potcar_lib` 后重试。
 
+### config_example.json 使用指引
+- 位置：`config_example.json`，可复制为 `my_config.json` 后按实际集群与 POTCAR 路径修改。
+- 加载：在命令中通过 `--json my_config.json` 显式指定，未指定不会自动读取。
+- 优先级：CLI 参数最高，可覆盖文件内的 `potcar_dir/potcar_type/kspacing/encut/job_system/max_workers` 等字段；未提供的字段沿用配置文件或默认值。
+- 常用示例：
+  ```bash
+  vasp relax -i POSCAR --json my_config.json --submit
+  vasp dos   -i ./structures --tasks 4 --json my_config.json
+  ```
+- 建议每个项目保存一份定制配置（如队列脚本头、POTCAR 路径），敏感信息勿提交仓库。
+
 ## 目录规则与执行模式
 - 结构输入：`-i` 接受单文件或目录，自动判定批量；`--structure-ext` 过滤扩展名（如 `vasp,cif,res,xsf`，默认 vasp）。
 - 压强分层：`-p/--pressure` 支持多值（GPa，写入 INCAR `PSTRESS=pressure*10`），目录为 `<结构前缀>/<pressure>_GPa/01_relax...`，结构前缀为文件去后缀或目录下文件名去后缀。
