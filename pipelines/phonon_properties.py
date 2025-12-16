@@ -16,7 +16,7 @@ from typing import Optional, List
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import ensure_poscar, prepare_potcar, check_vasp_completion
 from vasp.analysis import plotters
-from vasp.utils.job import load_job_config, write_job_script, submit_job
+from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +46,12 @@ class PhononPropertiesPipeline(BasePipeline):
         encut: Optional[float] = None,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
-        potcar_dir: Optional[Path] = None,
-        potcar_type: str = "PBE",
         include_relax: bool = True,
         custom_steps: Optional[List[str]] = None,
         pressure: float = 0.0,
+        potcar_map: Optional[dict[str, str]] = None,
+        job_cfg: Optional[JobConfig] = None,
+        config_path: Optional[Path] = None,
         **kwargs
     ):
         """
@@ -76,10 +77,6 @@ class PhononPropertiesPipeline(BasePipeline):
             队列系统
         mpi_procs : int, optional
             mpirun -np 参数，默认取 rc 中设置或8
-        potcar_dir : Path, optional
-            POTCAR库目录，如果不提供则需要手动准备POTCAR
-        potcar_type : str
-            POTCAR类型：'PBE', 'LDA', 'PW91'等
         include_relax : bool
             是否在声子前自动进行结构优化
         custom_steps : List[str], optional
@@ -89,7 +86,7 @@ class PhononPropertiesPipeline(BasePipeline):
         """
         super().__init__(structure_file, work_dir, pressure=pressure, **kwargs)
 
-        self.job_cfg = load_job_config()
+        self.job_cfg = job_cfg or load_job_config(config_path)
         self.supercell = supercell or [2, 2, 2]
         self.method = method
         self.kdensity = kdensity or 8000
@@ -101,9 +98,7 @@ class PhononPropertiesPipeline(BasePipeline):
         self.include_relax = include_relax
         self.custom_steps = self._normalize_steps(custom_steps)
         self.pressure = pressure
-        default_potcar = self.job_cfg.potcar_dir if self.job_cfg else None
-        self.potcar_dir = Path(potcar_dir) if potcar_dir else default_potcar
-        self.potcar_type = potcar_type
+        self.potcar_map = potcar_map or {}
 
         # 子目录
         self.relax_dir = self.work_dir / "01_relax"
@@ -190,18 +185,16 @@ class PhononPropertiesPipeline(BasePipeline):
         self._write_kpoints(self.relax_dir / "KPOINTS", self.relax_dir / "POSCAR", self.kspacing)
 
         # 准备POTCAR
-        if self.potcar_dir:
-            from vasp.pipelines.utils import prepare_potcar
-            if not prepare_potcar(
-                self.relax_dir / "POSCAR",
-                self.potcar_dir,
-                self.relax_dir / "POTCAR",
-                self.potcar_type
-            ):
-                logger.error("POTCAR准备失败")
-                return False
-        else:
-            logger.warning("未提供potcar_dir，请确保POTCAR文件已手动准备好")
+        if not self.potcar_map:
+            logger.error("缺少 [potcar] 配置，无法生成 POTCAR")
+            return False
+        if not prepare_potcar(
+            self.relax_dir / "POSCAR",
+            self.potcar_map,
+            self.relax_dir / "POTCAR",
+        ):
+            logger.error("POTCAR准备失败")
+            return False
 
         # 提交任务
         job_script = self._write_job_script(self.relax_dir, "relax")
@@ -301,8 +294,8 @@ class PhononPropertiesPipeline(BasePipeline):
                     potcar_source = self.relax_dir / "POTCAR"
                     if potcar_source.exists():
                         shutil.copy(potcar_source, disp_dir / "POTCAR")
-                    elif self.potcar_dir:
-                        if not prepare_potcar(disp_dir / "POSCAR", self.potcar_dir, disp_dir / "POTCAR", self.potcar_type):
+                    elif self.potcar_map:
+                        if not prepare_potcar(disp_dir / "POSCAR", self.potcar_map, disp_dir / "POTCAR"):
                             logger.error("POTCAR准备失败")
                             return False
                     else:

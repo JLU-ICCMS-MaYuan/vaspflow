@@ -1,43 +1,27 @@
 # VASP 计算工具使用指南
 
-## 配置与优先级
-- 运行入口已简化：命令行仅接受 `-i/--input`（文件或目录）、`-p/--pressure`（可多值，可省略使用配置）以及 `--config`（必填，指定 JSON）。所有模块与参数由配置文件决定。
-- 程序与赝势来源（高→低）：① 环境变量 `VASP_STD`/`VASP_GAM`、`POTCAR_DIR`、`VASP_MPI_PROCS`，脚本头可用 `JOB_HEADER_BASH/SLURM/PBS/LSF` 覆盖；② `vasp/config/job_templates.toml` 的 `defaults` 与 `templates`（按 bash/slurm/pbs/lsf 定义头）；③ 兼容旧 `~/.my_scriptrc.py` (`vaspstd_path/vaspgam_path/potcar_dir/*title/default_mpi_procs`)；④ 内置默认。
-- 配置优先：模块与参数来自 `--config` 指定的 JSON；命令行仅覆盖输入路径与压强。
-- 赝势管理：优先使用当前工作目录下的 `potcar_lib`（支持 `potcar_lib/元素` 或 `potcar_lib/元素/POTCAR`），若缺元素且提供 `potcar_dir` 则仅在 `potcar_dir`（含 `potcar_type` 子目录）中寻找唯一候选并复制到 `potcar_lib`。若找不到或候选不唯一会报错，请手动将所需 POTCAR 放入 `potcar_lib` 后重试。
+## 配置来源（唯一）
+- 仅接受 TOML：工作目录 `job_templates.local.toml`，或通过 `--config` 指定；仓库内 `config/job_templates.toml` 仅作模板不被读取。
+- `[defaults]` 提供 `vasp_std`/`vasp_gam`、`mpi_procs`；`[templates.*]` 为作业脚本头。
+- `[settings]` 收录 `modules`（必填）、`kspacing`/`encut`、`job_system`、`max_workers`、`structure_ext`、`dos_type`、`include_*`、`submit`、`pressure` 等通用参数。
+- `[phonon]`、`[md]`、`[tasks]` 为专用子段，可覆盖对应参数。
+- `[potcar]` 必填：元素符号 -> POTCAR 绝对路径，程序按 POSCAR 元素顺序拼接。
 
-### config_example.json 使用指引
-- 位置：`config_example.json`，可复制为 `my_config.json` 后按实际集群与 POTCAR 路径修改。
-- 加载：在命令中通过 `--config my_config.json` 显式指定，未指定不会自动读取。
-- 配置字段：`modules`（如 `["relax","scf","dos"]`）、`potcar_dir/potcar_type`、`kspacing/encut`、`job_system/mpi_procs`、`tasks/max_workers`、`submit` 等。
-- 优先级：CLI 仅覆盖输入与压强；其余字段以配置为准。
-- 常用示例：
-  ```bash
-  vasp -i POSCAR --config my_config.json -p 0 5
-  vasp -i ./structures --config my_config.json
-  ```
-- 建议每个项目保存一份定制配置（如队列脚本头、POTCAR 路径），敏感信息勿提交仓库。
+## 命令与执行
+- 入口命令：`vasp -i <结构文件或目录> [-p 压强列表] [--config 路径]`。未指定 `--config` 时默认寻找当前目录 `job_templates.local.toml`，缺失即报错。
+- 模块顺序完全由 `[settings].modules` 决定（如 `["relax","scf","dos"]`）；`-p` 覆盖配置中的 `pressure`，默认为 `[0]`。
+- 目录输入自动批量；并行度来自 `[tasks].max_workers` 或 `[settings].max_workers`（<=1 串行）。
+- `submit=true` 时自动提交生成的 `run_*.sh`，否则仅生成输入与脚本。
 
-## 目录规则与执行模式
-- 结构输入：`-i` 接受单文件或目录，自动判定批量；`--structure-ext` 过滤扩展名（如 `vasp,cif,res,xsf`，默认 vasp）。
-- 压强分层：`-p/--pressure` 支持多值（GPa，写入 INCAR `PSTRESS=pressure*10`），目录为 `<结构前缀>/<pressure>_GPa/01_relax...`，结构前缀为文件去后缀或目录下文件名去后缀。
-- 批量与并行：目录输入自动批量；`--tasks N` 控制同时处理的结构数（>1 并行），每个压强/结构生成 `batch_summary.txt`。
-- 提交策略：默认仅生成输入与 `run_*.sh`；加 `--submit` 时提交并等待本命令覆盖的全部步骤完成（含批量/多压强、phonon 子位移），结束后在工作目录写 `finished`。
-- 状态与重跑：`prepare_only` 模式步骤标记为 `PREPARED`，不会记为完成；重复运行会按产物检查（OUTCAR/CHGCAR 等）决定是否重跑，缺产物或仅 `PREPARED` 一律视为未完成。失败不重试，直接报错退出。
+## 作业脚本与可执行
+- VASP 可执行路径与队列头只读自当前配置文件；不再支持环境变量或用户级配置。
+- 生成脚本时优先使用 `templates.<queue>`，缺失则回退到 bash 头；MPI 进程数默认用 `[defaults].mpi_procs`，可被 `mpi_procs` 覆盖。
 
-## 步骤依赖与并行编排
-- 基础步骤：`relax`；`scf` 依赖 relax；`dos/band/elf/cohp/bader/fermisurface` 依赖 relax+scf；`phonon` 依赖 relax；`md` 依赖 relax。
-- 组合执行：`combo` 支持串写模块（如 `relax phonon dos`），程序自动补齐依赖；relax 完成后并行启动 phonon 与电子链路（scf→dos/band/elf/cohp/bader/fermisurface），md 也可并行，统一由 Python 监控。
-- 任务提交：bash 直接在目录内启动；队列模式通过 `run_*.sh` 调用 `sbatch/qsub/bsub`，任务号消失后再查 OUTCAR 判定完成。
+## POTCAR 处理
+- 不再搜索 `potcar_dir` 或 `potcar_lib`。程序仅使用 `[potcar]` 映射，按 POSCAR 中的元素顺序拼接成 POTCAR。
+- 缺失元素或路径不存在将直接报错，请先在配置中补全；无需交互选择。
 
-## 输出、断点与检查
-- 每条子链有独立 `pipeline_checkpoint.json` 与 `pipeline_report.txt`；成功结束写 `finished`。已完成且产物存在才会跳过，若缺少关键文件则降级为未完成重跑。
-- 批量模式在压强目录下生成 `batch_summary.txt` 汇总成功/失败。
-
-## 常用示例（自动建目录）
-- 建议将 `config_example.json` 复制为 `my_config.json`，填写 `modules`（如 `["relax","scf","dos"]`）、`potcar_dir`、`job_system`、`mpi_procs`、`tasks/max_workers`、`submit` 等。
-- 单结构：`vasp -i POSCAR --config my_config.json -p 0 5`
-- 目录批量 + 多压强：`vasp -i ./structures --config my_config.json -p 0 10`
-- 运行前准备赝势：在当前工作目录创建 `potcar_lib`，放入选定赝势（如 `potcar_lib/Si/POTCAR`）；缺失元素时若提供 `potcar_dir` 会复制唯一匹配项到 `potcar_lib`，否则报错提示手动补齐。
-
-这些命令覆盖单结构/批量、多压强场景；其他参数均在配置文件中维护，更新配置即可复用同一命令。
+## 目录与产物（概览）
+- 单结构：`<stem>/<pressure>_GPa/01_relax -> 02_scf -> ...`；批量目录下按文件名分组。
+- 每个步骤输出 `pipeline_checkpoint.json`、`pipeline_report.txt` 与 `run_*.sh`，完成后写 `finished` 标记。
+- 重复运行会基于产物检查决定跳过/重跑；prepare_only 模式仅生成输入不提交。

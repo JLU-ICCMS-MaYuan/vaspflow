@@ -14,8 +14,15 @@ import sys
 import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
-import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+try:  # Python 3.11+
+    import tomllib  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - 兼容旧版
+    try:
+        import tomli as tomllib  # type: ignore
+    except ModuleNotFoundError:
+        tomllib = None
 
 # 优先使用当前项目的 vasp 包，避免被其他可编辑安装覆盖
 _PROJECT_ROOT = Path(__file__).resolve().parent
@@ -69,6 +76,69 @@ def parse_pressures(values) -> list[float]:
     if isinstance(values, (int, float)):
         return [float(values)]
     return [float(v) for v in values]
+
+
+def load_toml_config(config_path: Path) -> Dict[str, Any]:
+    """从 TOML 读取运行配置。"""
+    if not tomllib:
+        raise RuntimeError("当前 Python 不支持 tomllib，请使用 3.11+ 或安装 tomli")
+    if not config_path.exists():
+        raise FileNotFoundError(f"未找到配置文件: {config_path}")
+    with config_path.open("rb") as f:
+        return tomllib.load(f) or {}
+
+
+def build_runtime_config(raw: Dict[str, Any], config_path: Path) -> Dict[str, Any]:
+    """
+    将 job_templates.toml 的结构化字段摊平为运行时配置。
+    约定:
+      - [defaults]/[templates] 由 load_job_config 读取
+      - [settings] 存放 modules/参数
+      - [tasks] 可覆盖并发度
+      - [phonon]、[md] 为专用子段
+      - [potcar] 必填：元素 -> POTCAR 绝对路径
+    """
+    settings = raw.get("settings", {}) or {}
+    tasks_cfg = raw.get("tasks", {}) or {}
+    phonon_cfg = raw.get("phonon", {}) or {}
+    md_cfg = raw.get("md", {}) or {}
+    potcar_map = raw.get("potcar", {}) or {}
+
+    config: Dict[str, Any] = {}
+    config["modules"] = settings.get("modules") or []
+    config["pressure"] = settings.get("pressure")
+    config["kspacing"] = settings.get("kspacing")
+    config["encut"] = settings.get("encut")
+    config["job_system"] = settings.get("job_system", "bash")
+    config["mpi_procs"] = settings.get("mpi_procs")
+    config["tasks"] = tasks_cfg.get("max_workers") or settings.get("max_workers") or settings.get("tasks")
+    config["structure_ext"] = settings.get("structure_ext")
+    config["dos_type"] = settings.get("dos_type", "element")
+    config["include_elf"] = settings.get("include_elf", False)
+    config["include_cohp"] = settings.get("include_cohp", False)
+    config["include_bader"] = settings.get("include_bader", False)
+    config["include_fermi"] = settings.get("include_fermi", False)
+    config["submit"] = settings.get("submit", False)
+    config["log_level"] = settings.get("log_level")
+
+    # 专用子段
+    config["supercell"] = phonon_cfg.get("supercell") or settings.get("supercell")
+    config["method"] = phonon_cfg.get("method") or settings.get("method")
+    config["potim"] = md_cfg.get("potim") or settings.get("potim")
+    config["tebeg"] = md_cfg.get("tebeg") or settings.get("tebeg")
+    config["teend"] = md_cfg.get("teend") or settings.get("teend")
+    config["nsw"] = md_cfg.get("nsw") or settings.get("nsw")
+
+    potcar_root = config_path.parent
+    resolved_map: Dict[str, str] = {}
+    for k, v in potcar_map.items():
+        path_obj = Path(str(v)).expanduser()
+        if not path_obj.is_absolute():
+            path_obj = (potcar_root / path_obj).resolve()
+        resolved_map[k] = str(path_obj)
+    config["potcar_map"] = resolved_map
+    config["config_path"] = config_path
+    return config
 
 
 def format_pressure_dir(pressure: float) -> str:
@@ -159,8 +229,6 @@ def run_properties_command(args, title: str, modules: list[str]):
                 "plot_dos_type": final_config.get("dos_type", "element"),
                 "queue_system": final_config.get("job_system", "bash"),
                 "mpi_procs": final_config.get("mpi_procs"),
-                "potcar_dir": Path(final_config["potcar_dir"]) if final_config.get("potcar_dir") else None,
-                "potcar_type": final_config.get("potcar_type", "PBE"),
                 "prepare_only": not final_config.get("submit", False),
                 "requested_steps": modules,
                 "run_relax": True,
@@ -208,27 +276,8 @@ def run_properties_command(args, title: str, modules: list[str]):
 
 
 def load_json_config(json_file: Path) -> Dict[str, Any]:
-    """
-    从JSON文件加载配置
-
-    Parameters
-    ----------
-    json_file : Path
-        JSON配置文件路径
-
-    Returns
-    -------
-    Dict[str, Any]
-        配置字典
-    """
-    try:
-        with open(json_file, 'r') as f:
-            config = json.load(f)
-        logger.info(f"从JSON文件加载配置: {json_file}")
-        return config
-    except Exception as e:
-        logger.error(f"加载JSON配置文件失败: {e}")
-        sys.exit(1)
+    """已弃用：仅支持 TOML 配置，请使用 --config 指定 job_templates.local.toml。"""
+    raise RuntimeError("请使用 TOML 配置 (--config) 运行，不再支持 JSON")
 
 
 def merge_configs(json_config: Dict[str, Any], cli_args: argparse.Namespace) -> Dict[str, Any]:
@@ -249,20 +298,7 @@ def merge_configs(json_config: Dict[str, Any], cli_args: argparse.Namespace) -> 
     Dict[str, Any]
         合并后的配置
     """
-    merged = {}
-
-    # 1. 先应用JSON配置
-    for key, value in json_config.items():
-        merged[key] = value
-
-    # 2. 命令行参数覆盖JSON配置
-    # 只有当命令行参数不是None（即用户明确指定）时才覆盖
-    for key, value in vars(cli_args).items():
-        # 跳过None值（用户未指定）和一些特殊字段
-        if value is not None and key not in ['command', 'json', 'func']:
-            merged[key] = value
-
-    return merged
+    raise RuntimeError("已移除 JSON/命令行混合配置，请使用 --config 指定 TOML")
 
 
 def detect_batch_mode(input_path: Path, structure_exts: Optional[list[str]] = None) -> bool:
@@ -371,11 +407,23 @@ def _run_combo_pipeline(
         cfg_common = {
             "kspacing": config.get("kspacing", 0.2),
             "encut": config.get("encut"),
-            "potcar_dir": Path(config["potcar_dir"]) if config.get("potcar_dir") else None,
-            "potcar_type": config.get("potcar_type", "PBE"),
             "job_system": config.get("job_system", "bash"),
             "mpi_procs": config.get("mpi_procs"),
             "prepare_only": not config.get("submit", False),
+            "potcar_map": config.get("potcar_map") or {},
+            "job_cfg": config.get("job_cfg"),
+            "config_path": config.get("config_path"),
+            "include_elf": config.get("include_elf", False),
+            "include_cohp": config.get("include_cohp", False),
+            "include_bader": config.get("include_bader", False),
+            "include_fermi": config.get("include_fermi", False),
+            "dos_type": config.get("dos_type", "element"),
+            "supercell": config.get("supercell"),
+            "method": config.get("method"),
+            "potim": config.get("potim"),
+            "tebeg": config.get("tebeg"),
+            "teend": config.get("teend"),
+            "nsw": config.get("nsw"),
         }
 
         need_phonon = "phonon" in modules
@@ -494,8 +542,6 @@ def command_relax(args):
             pipeline_kwargs = {
                 "kspacing": final_config.get("kspacing", 0.2),
                 "encut": final_config.get("encut"),
-                "potcar_dir": Path(final_config["potcar_dir"]) if final_config.get("potcar_dir") else None,
-                "potcar_type": final_config.get("potcar_type", "PBE"),
                 "queue_system": final_config.get("job_system", "bash"),
                 "mpi_procs": final_config.get("mpi_procs"),
                 "prepare_only": not final_config.get("submit", False),
@@ -624,8 +670,6 @@ def command_phonon(args):
             'encut': final_config.get('encut'),
             'queue_system': final_config.get('job_system', 'bash'),
             'mpi_procs': final_config.get('mpi_procs'),
-            'potcar_dir': Path(final_config['potcar_dir']) if final_config.get('potcar_dir') else None,
-            'potcar_type': final_config.get('potcar_type', 'PBE'),
             'prepare_only': not final_config.get('submit', False),
             'include_relax': True,
         }
@@ -710,8 +754,6 @@ def command_md(args):
                 "nsw": final_config.get("nsw", 200),
                 "kspacing": final_config.get("kspacing", 0.2),
                 "encut": final_config.get("encut"),
-                "potcar_dir": Path(final_config["potcar_dir"]) if final_config.get("potcar_dir") else None,
-                "potcar_type": final_config.get("potcar_type", "PBE"),
                 "queue_system": final_config.get("job_system", "bash"),
                 "mpi_procs": final_config.get("mpi_procs"),
                 "prepare_only": not final_config.get("submit", False),
@@ -760,12 +802,13 @@ def _run_relax_pipeline(structure_file: Path, work_dir: Path, cfg: Dict[str, Any
         work_dir=work_dir,
         kspacing=cfg.get("kspacing", 0.2),
         encut=cfg.get("encut"),
-        potcar_dir=cfg.get("potcar_dir"),
-        potcar_type=cfg.get("potcar_type", "PBE"),
         queue_system=cfg.get("job_system", "bash"),
         mpi_procs=cfg.get("mpi_procs"),
         prepare_only=cfg.get("prepare_only", True),
         pressure=pressure,
+        potcar_map=cfg.get("potcar_map") or {},
+        job_cfg=cfg.get("job_cfg"),
+        config_path=cfg.get("config_path"),
     )
     ok = pipeline.run()
     return {
@@ -786,13 +829,14 @@ def _run_phonon_pipeline(structure_file: Path, work_dir: Path, cfg: Dict[str, An
         encut=cfg.get("encut"),
         queue_system=cfg.get("job_system", "bash"),
         mpi_procs=cfg.get("mpi_procs"),
-        potcar_dir=cfg.get("potcar_dir"),
-        potcar_type=cfg.get("potcar_type", "PBE"),
         prepare_only=cfg.get("prepare_only", True),
         include_relax=False,
         pressure=pressure,
         checkpoint_file=work_dir / "phonon_checkpoint.json",
         report_file=work_dir / "phonon_report.txt",
+        potcar_map=cfg.get("potcar_map") or {},
+        job_cfg=cfg.get("job_cfg"),
+        config_path=cfg.get("config_path"),
     )
     return pipeline.run()
 
@@ -807,21 +851,22 @@ def _run_properties_pipeline(structure_file: Path, work_dir: Path, modules: list
         work_dir=work_dir,
         kspacing=cfg.get("kspacing", 0.2),
         encut=cfg.get("encut"),
-        include_elf=include_elf,
-        include_cohp=include_cohp,
-        include_bader=include_bader,
-        include_fermi=include_fermi,
+        include_elf=cfg.get("include_elf", include_elf) or include_elf,
+        include_cohp=cfg.get("include_cohp", include_cohp) or include_cohp,
+        include_bader=cfg.get("include_bader", include_bader) or include_bader,
+        include_fermi=cfg.get("include_fermi", include_fermi) or include_fermi,
         plot_dos_type=cfg.get("dos_type", "element"),
         queue_system=cfg.get("job_system", "bash"),
         mpi_procs=cfg.get("mpi_procs"),
-        potcar_dir=cfg.get("potcar_dir"),
-        potcar_type=cfg.get("potcar_type", "PBE"),
         prepare_only=cfg.get("prepare_only", True),
         requested_steps=modules,
         run_relax=False,
         pressure=pressure,
         checkpoint_file=work_dir / "electronic_checkpoint.json",
         report_file=work_dir / "electronic_report.txt",
+        potcar_map=cfg.get("potcar_map") or {},
+        job_cfg=cfg.get("job_cfg"),
+        config_path=cfg.get("config_path"),
     )
     return pipeline.run()
 
@@ -836,8 +881,6 @@ def _run_md_pipeline(structure_file: Path, work_dir: Path, cfg: Dict[str, Any], 
         nsw=cfg.get("nsw", 200),
         kspacing=cfg.get("kspacing", 0.2),
         encut=cfg.get("encut"),
-        potcar_dir=cfg.get("potcar_dir"),
-        potcar_type=cfg.get("potcar_type", "PBE"),
         queue_system=cfg.get("job_system", "bash"),
         mpi_procs=cfg.get("mpi_procs"),
         prepare_only=cfg.get("prepare_only", True),
@@ -845,6 +888,9 @@ def _run_md_pipeline(structure_file: Path, work_dir: Path, cfg: Dict[str, Any], 
         pressure=pressure,
         checkpoint_file=work_dir / "md_checkpoint.json",
         report_file=work_dir / "md_report.txt",
+        potcar_map=cfg.get("potcar_map") or {},
+        job_cfg=cfg.get("job_cfg"),
+        config_path=cfg.get("config_path"),
     )
     return pipeline.run()
 
@@ -856,17 +902,12 @@ def command_combo(args):
     logger.info(f"VASP 组合计算: {' '.join(modules)}")
     logger.info("=" * 80)
 
-    config = {}
-    if args.json:
-        config = load_json_config(Path(args.json))
-    final_config = merge_configs(config, args)
-
-    input_path = Path(final_config["input"])
-    structure_exts = parse_structure_exts(final_config.get("structure_ext"))
-    pressures = parse_pressures(final_config.get("pressure"))
+    input_path = Path(args.input)
+    structure_exts = parse_structure_exts(getattr(args, "structure_ext", None))
+    pressures = parse_pressures(args.pressure)
     base_root = derive_work_root(input_path)
     is_batch = detect_batch_mode(input_path, structure_exts)
-    tasks = final_config.get("tasks") or 1
+    tasks = args.tasks or 1
     tasks = tasks if tasks > 0 else 1
 
     if not modules:
@@ -891,6 +932,28 @@ def command_combo(args):
     try:
         logger.info(f"批量模式: 处理目录 {input_path}，压强 {pressures}")
         tasks_limit = tasks if tasks > 0 else 1
+        runtime_config = {
+            "kspacing": args.kspacing,
+            "encut": args.encut,
+            "job_system": args.job_system,
+            "mpi_procs": args.mpi_procs,
+            "prepare_only": not args.submit,
+            "submit": args.submit,
+            "supercell": args.supercell,
+            "method": args.method,
+            "potim": args.potim,
+            "tebeg": args.tebeg,
+            "teend": args.teend,
+            "nsw": args.nsw,
+            "dos_type": args.dos_type,
+            "potcar_map": getattr(args, "potcar_map", {}) or {},
+            "job_cfg": getattr(args, "job_cfg", None),
+            "config_path": getattr(args, "config_path", None),
+            "include_elf": getattr(args, "include_elf", False),
+            "include_cohp": getattr(args, "include_cohp", False),
+            "include_bader": getattr(args, "include_bader", False),
+            "include_fermi": getattr(args, "include_fermi", False),
+        }
         results = _run_matrix_tasks(
             structures=structures,
             pressures=pressures,
@@ -901,7 +964,7 @@ def command_combo(args):
                 "need_phonon": need_phonon,
                 "property_modules": property_modules,
                 "need_md": need_md,
-                "config": final_config,
+                "config": runtime_config,
             },
             tasks_limit=tasks_limit,
             pressure_first=False,
@@ -919,47 +982,60 @@ def create_parser():
     """创建简化命令行解析器：仅输入路径、压强和配置文件。"""
     parser = argparse.ArgumentParser(
         prog='vasp',
-        description='VASP 组合计算（参数从 JSON 配置读取，仅输入与压强走命令行）',
+        description='VASP 组合计算（参数从 job_templates.toml 读取，仅输入与压强走命令行）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  vasp -i POSCAR --config my_config.json -p 0 5
-  vasp -i ./structures --config my_config.json
+  vasp -i POSCAR --config job_templates.local.toml -p 0 5
+  vasp -i ./structures  # 默认读取当前目录 job_templates.local.toml
         """,
     )
     parser.add_argument('-i', '--input', required=True, help='输入文件或目录，自动判断批量/单结构')
     parser.add_argument('-p', '--pressure', type=float, nargs='+', help='外压(GPa)，可多值，覆盖配置文件')
-    parser.add_argument('--config', required=True, help='JSON 配置文件路径（需包含 modules 列表及其他参数）')
+    parser.add_argument('--config', help='TOML 配置文件路径（默认查找 ./job_templates.local.toml）')
     return parser
 
 
 def main():
-    """主入口函数：仅接收输入路径、压强与 JSON 配置，其他参数从配置文件读取。"""
+    """主入口函数：仅接收输入路径、压强与 TOML 配置，其他参数从配置文件读取。"""
     parser = create_parser()
     args = parser.parse_args()
 
-    config_path = Path(args.config).resolve()
+    default_config = Path.cwd() / "job_templates.local.toml"
+    config_path = Path(args.config).resolve() if args.config else default_config
+    repo_template = Path(__file__).resolve().parent / "config" / "job_templates.toml"
+    if config_path.resolve() == repo_template.resolve():
+        logger.error("config/job_templates.toml 仅为模板，请复制为 job_templates.local.toml 后使用")
+        sys.exit(1)
     if not config_path.exists():
-        logger.error(f"配置文件不存在: {config_path}")
+        logger.error(f"未找到配置文件: {config_path}，请通过 --config 指定或在当前目录提供 job_templates.local.toml")
         sys.exit(1)
 
-    config_data = load_json_config(config_path)
+    raw_config = load_toml_config(config_path)
+    config_data = build_runtime_config(raw_config, config_path)
     modules = config_data.get("modules")
     if not modules:
-        logger.error("配置文件缺少 modules 列表，例如 [\"relax\", \"scf\", \"dos\"]")
+        logger.error("配置文件缺少 [settings].modules 列表，例如 [\"relax\", \"scf\", \"dos\"]")
         sys.exit(1)
     unknown = [m for m in modules if m not in MODULES]
     if unknown:
         logger.error(f"配置中的 modules 包含未支持项: {unknown}，可选 {MODULES}")
         sys.exit(1)
 
-    effective_pressure = args.pressure if args.pressure is not None else config_data.get("pressure")
-    if effective_pressure is None:
-        effective_pressure = [0.0]
+    if not config_data.get("potcar_map"):
+        logger.error("配置文件缺少 [potcar] 段，需为每个元素提供 POTCAR 绝对路径")
+        sys.exit(1)
+
+    try:
+        job_cfg = load_job_config(config_path)
+    except Exception as exc:  # pragma: no cover - 运行期校验
+        logger.error(f"读取作业配置失败: {exc}")
+        sys.exit(1)
+
+    effective_pressure = args.pressure if args.pressure is not None else config_data.get("pressure") or [0.0]
 
     combo_args = argparse.Namespace(
         modules=modules,
-        json=str(config_path),
         input=args.input,
         pressure=effective_pressure,
         tasks=config_data.get("tasks") or config_data.get("max_workers"),
@@ -972,14 +1048,19 @@ def main():
         teend=config_data.get("teend"),
         nsw=config_data.get("nsw"),
         dos_type=config_data.get("dos_type"),
-        potcar_dir=config_data.get("potcar_dir"),
-        potcar_type=config_data.get("potcar_type"),
         structure_ext=config_data.get("structure_ext"),
         job_system=config_data.get("job_system"),
         mpi_procs=config_data.get("mpi_procs"),
         submit=config_data.get("submit", False),
         log_level=config_data.get("log_level"),
         tasks_limit=config_data.get("tasks"),
+        potcar_map=config_data.get("potcar_map"),
+        job_cfg=job_cfg,
+        config_path=config_path,
+        include_elf=config_data.get("include_elf", False),
+        include_cohp=config_data.get("include_cohp", False),
+        include_bader=config_data.get("include_bader", False),
+        include_fermi=config_data.get("include_fermi", False),
     )
 
     if combo_args.log_level:

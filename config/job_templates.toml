@@ -1,13 +1,43 @@
+# job_templates.toml 模板（示例）
+# 复制到工作目录并重命名为 job_templates.local.toml 后使用。
+
 [defaults]
 # VASP 可执行文件路径（必填）
 vasp_std = "/home/mayuan/soft/vasp.6.3.2/bin/vasp_std"
 vasp_gam = "/home/mayuan/soft/vasp.6.3.2/bin/vasp_gam"
-
-# POTCAR 根目录（必填）
-potcar_dir = "/home/mayuan/pot/vasp_pot/potpaw_PBE54"
-
 # 默认 MPI 进程数（未指定 --mpi-procs 时使用）
 mpi_procs = 8
+
+[settings]
+# 必填：模块列表，按顺序执行
+modules = ["relax", "scf", "dos"]
+# 可选：默认压强列表（GPa）
+pressure = [0]
+# 计算参数
+kspacing = 0.3
+encut = 500
+job_system = "bash"       # bash/slurm/pbs/lsf
+max_workers = 2           # 批量/多压强并行度
+structure_ext = "vasp"    # 目录输入时的结构后缀过滤
+dos_type = "element"      # element/spd/element_spd
+include_elf = false
+include_cohp = false
+include_bader = false
+include_fermi = false
+submit = false            # true 时自动提交 run_*.sh
+
+[phonon]
+supercell = [2, 2, 2]
+method = "disp"
+
+[md]
+potim = 1.0
+tebeg = 300.0
+teend = 300.0
+nsw = 200
+
+[tasks]
+max_workers = 2
 
 [templates.bash]
 header = """
@@ -61,3 +91,8 @@ header = """
 source /data/env/inteloneapi2021
 ulimit -s unlimited
 """
+
+[potcar]
+# 为每个元素写绝对路径；示例为 PBE54 库，请按需增删
+Si = "/home/mayuan/pot/vasp_pot/potpaw_PBE54/Si/POTCAR"
+O = "/home/mayuan/pot/vasp_pot/potpaw_PBE54/O/POTCAR"

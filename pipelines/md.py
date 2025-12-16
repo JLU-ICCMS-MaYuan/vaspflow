@@ -5,7 +5,7 @@ from typing import Optional, List
 
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import prepare_potcar, ensure_poscar
-from vasp.utils.job import load_job_config, write_job_script, submit_job
+from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +25,17 @@ class MdPipeline(BasePipeline):
         encut: Optional[float] = None,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
-        potcar_dir: Optional[Path] = None,
-        potcar_type: str = "PBE",
         include_relax: bool = True,
         custom_steps: Optional[List[str]] = None,
         pressure: float = 0.0,
+        potcar_map: Optional[dict[str, str]] = None,
+        job_cfg: Optional[JobConfig] = None,
+        config_path: Optional[Path] = None,
         **kwargs,
     ):
         super().__init__(structure_file, work_dir, pressure=pressure, **kwargs)
 
-        self.job_cfg = load_job_config()
+        self.job_cfg = job_cfg or load_job_config(config_path)
         self.potim = potim
         self.tebeg = tebeg
         self.teend = teend
@@ -43,9 +44,7 @@ class MdPipeline(BasePipeline):
         self.encut = encut
         self.queue_system = queue_system or "bash"
         self.mpi_procs = mpi_procs
-        default_potcar = self.job_cfg.potcar_dir if self.job_cfg else None
-        self.potcar_dir = Path(potcar_dir) if potcar_dir else default_potcar
-        self.potcar_type = potcar_type
+        self.potcar_map = potcar_map or {}
         self.include_relax = include_relax
         self.custom_steps = self._normalize_steps(custom_steps)
         self.pressure = pressure
@@ -95,17 +94,16 @@ class MdPipeline(BasePipeline):
         self._write_relax_incar(self.relax_dir / "INCAR")
         self._write_kpoints(self.relax_dir / "KPOINTS", self.relax_dir / "POSCAR", self.kspacing)
 
-        if self.potcar_dir:
-            if not prepare_potcar(
-                self.relax_dir / "POSCAR",
-                self.potcar_dir,
-                self.relax_dir / "POTCAR",
-                self.potcar_type,
-            ):
-                logger.error("POTCAR准备失败")
-                return False
-        else:
-            logger.warning("未提供 potcar_dir，请确保已手动准备 POTCAR")
+        if not self.potcar_map:
+            logger.error("缺少 [potcar] 配置，无法生成 POTCAR")
+            return False
+        if not prepare_potcar(
+            self.relax_dir / "POSCAR",
+            self.potcar_map,
+            self.relax_dir / "POTCAR",
+        ):
+            logger.error("POTCAR准备失败")
+            return False
 
         job_script = self._write_job_script(self.relax_dir, "relax")
 
@@ -146,17 +144,16 @@ class MdPipeline(BasePipeline):
 
         if self.include_relax and self.relax_dir and (self.relax_dir / "POTCAR").exists():
             shutil.copy(self.relax_dir / "POTCAR", self.md_dir / "POTCAR")
-        elif self.potcar_dir:
+        elif self.potcar_map:
             if not prepare_potcar(
                 self.md_dir / "POSCAR",
-                self.potcar_dir,
+                self.potcar_map,
                 self.md_dir / "POTCAR",
-                self.potcar_type,
             ):
                 logger.error("POTCAR准备失败")
                 return False
         else:
-            logger.warning("未提供 potcar_dir，请确保已手动准备 POTCAR")
+            logger.error("缺少 POTCAR，请在 [potcar] 中配置所有元素的路径")
 
         job_script = self._write_job_script(self.md_dir, "md")
 

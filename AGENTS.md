@@ -4,15 +4,15 @@
 - `cli.py`：主 CLI 入口，可 `python cli.py ...` 或安装后使用 `vasp`；重写多模块串写为 combo，统一调度入口。
 - `pipelines/`：核心管线实现（relax、电子性质、phonon、md、批量调度），`utils.py` 负责结构校验与通用工具，结果写入工作目录下的压力子目录。
 - `workflows/`：面向用户的工作流封装，编排单任务、批量与后处理，便于脚本化调用。
-- `io/`：POSCAR/OUTCAR/vasprun.xml 等读写工具；`config/`：队列模板 `job_templates.toml` 与示例 `config_example.json`；`scheduler/`：调度辅助。
+- `io/`：POSCAR/OUTCAR/vasprun.xml 等读写工具；`config/`：队列模板 `job_templates.toml`（仅作为示例，运行时不读取）；`scheduler/`：调度辅助。
 - `analysis/`：绘图辅助；`utils/`：作业工具；`examples/`：放置示例输入；`VASP_error_collecting.md`：故障记录，复现场景前先查阅。
 
 ## 开发、构建与运行
-- Python 3.12+，`python -m venv .venv && source .venv/bin/activate`，开发时 `export PYTHONPATH=$(pwd):$PYTHONPATH`，无额外构建。
-- 查看帮助：`python cli.py --help`。仅准备输入：`python cli.py relax -i POSCAR --kspacing 0.2 --encut 520`（不提交队列），便于本地快速验证。
-- Slurm 提交示例：`python cli.py relax -i POSCAR -j slurm --mpi-procs "srun -n 32" --submit`；批量并行：`python cli.py relax -i ./structures --tasks 4 --submit`。
-- 读取 JSON 配置：`python cli.py dos -i POSCAR --json config_example.json --submit`；优先使用 CLI 参数覆盖配置。
-- 本地调试可先运行 prepare-only，再在同一目录用 `--submit` 复用产物；如需可编辑安装，使用 `pip install -e .` 方式。
+- Python 3.12+，`python -m venv .venv && source .venv/bin/activate`，开发时 `export PYTHONPATH=$(pwd):$PYTHONPATH`，无额外构建，可用 `pip install -e .` 做可编辑安装。
+- CLI 仅读取 TOML：默认查找工作目录 `job_templates.local.toml`，或通过 `--config` 指定；仓库内 `config/job_templates.toml` 仅作模板。
+- 基本用法：`vasp -i POSCAR --config job_templates.local.toml -p 0 5`；批量：`vasp -i ./structures --config job_templates.local.toml -p 0 5 10`。
+- 并行与提交：并发来自 `[tasks].max_workers` 或 `[settings].max_workers`，`submit=true` 时自动提交 `run_*.sh`，否则仅生成输入。
+- 调试建议：先在 prepare 模式检查目录结构与 POTCAR，确认无误后再打开 `submit`；日志在各工作子目录 `pipeline.log`。 
 
 ## 代码风格与命名
 - Python/PEP8，4 空格缩进，使用类型标注；函数与模块用 `snake_case`，类用 `PascalCase`。
@@ -34,8 +34,9 @@
 - 代码评审关注：默认参数、路径拼接、安全边界（文件覆盖、队列命令注入）、并发锁与异常处理；发现风险请在 PR 中明确。
 
 ## 配置与安全提示
-- 优先级：CLI 参数最高，其次 `config/job_templates.toml`，然后环境变量 `VASP_STD/VASP_GAM/POTCAR_DIR/VASP_MPI_PROCS`，最后内置默认；示例 JSON 需显式通过 `--json` 传入。
-- 提交前核查 `potcar_lib/` 与 `--potcar-type`，批量任务先用少量结构试跑；根据集群调整模板头部，避免提交真实队列账号或路径。
+- 配置来源唯一：`--config` 指定的 TOML 或当前目录 `job_templates.local.toml`；不再读取环境变量、用户级配置或仓库模板。
+- `[potcar]` 必填：元素 -> POTCAR 绝对路径；缺失元素或路径不存在会直接报错，不再支持 potcar_dir/potcar_lib 搜索。
+- 调整队列模板时勿提交真实账号路径；批量任务先用少量结构自检，关注 `pipeline.log` 与 `pipeline_report.txt`。
 - 产出目录包含 `pipeline_checkpoint.json`/`pipeline_report.txt`/`finished` 标记，可用于排查；异常时先查 `VASP_error_collecting.md`，再最小化复现场景。 
 
 ## 协作与记录
@@ -47,5 +48,5 @@
 - 2025-12-15：新增 `pyproject.toml` 与 `setup.cfg` 支持 `pip install -e .`，映射包名 `vasp` 并打包默认模板；`parser_vasp` 在缺少 structuregenerator 时给出可选依赖提示。
 - 2025-12-15：添加 `.gitignore` 并清理已跟踪的 `__pycache__/*.pyc` 等构建/缓存产物，避免再次提交；本地工作目录可保留 `test/` 示例结构自测。
 - 2025-12-15：新增 `vasp_cli_entry.py` 与入口脚本映射 `vasp/vaspflow -> vasp_cli_entry:main`，在运行时强制优先加载当前项目的 `vasp` 包，避免与其他同名包冲突导致 CLI 无法导入 pipelines。
-- 2025-12-15：完善 `config_example.json` 使用说明，指导复制为自定义配置并通过 `--json` 显式加载，明确 CLI 覆盖优先级与示例命令。
-- 2025-12-16：简化 CLI，只保留 `-i/--input`、`-p/--pressure` 与 `--config`，模块与其他参数全部由配置文件提供；更新 `config_example.json` 添加 `modules`/`submit`，重写 README 用法说明。
+- 2025-12-15：完善 `config_example.json` 使用说明（已废弃，现已移除并合并到 TOML 模板）。
+- 2025-12-16：配置与赝势来源统一为 TOML（仅读取 `job_templates.local.toml` 或 `--config` 指定文件），移除环境变量/用户级兼容；POTCAR 仅按 `[potcar]` 映射拼接；CLI 仍只保留 `-i`/`-p`/`--config`，README 更新为新用法。

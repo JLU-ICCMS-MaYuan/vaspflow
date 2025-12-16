@@ -11,7 +11,10 @@ from typing import Optional, Union
 try:  # Python 3.11+
     import tomllib  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - 兼容旧版
-    tomllib = None
+    try:
+        import tomli as tomllib  # type: ignore
+    except ModuleNotFoundError:
+        tomllib = None
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +25,11 @@ class JobConfig:
 
     vasp_std: str
     vasp_gam: str
-    potcar_dir: Optional[Path]
     bashtitle: str
     slurmtitle: Optional[str]
     pbstitle: Optional[str]
     lsftitle: Optional[str]
     default_mpi_procs: int = 8
-
-_TOML_PATH = Path(__file__).resolve().parent.parent / "config" / "job_templates.toml"
-_USER_TOML = Path.home() / ".config" / "vasp" / "job_templates.toml"
-_LOCAL_TOML = Path.cwd() / "job_templates.local.toml"
 
 
 def _load_templates_from_toml(toml_path: Path) -> tuple[dict, dict]:
@@ -39,68 +37,57 @@ def _load_templates_from_toml(toml_path: Path) -> tuple[dict, dict]:
     if not tomllib or not toml_path.exists():
         return {}, {}
 
-    try:
-        with toml_path.open("rb") as f:
-            data = tomllib.load(f)
-        defaults = data.get("defaults", {}) or {}
-        templates_raw = data.get("templates", {}) or {}
-        templates = {k.lower(): (v.get("header") or "").strip() for k, v in templates_raw.items()}
-        return defaults, templates
-    except Exception as exc:  # pragma: no cover
-        logger.warning("读取 job_templates.toml 失败，使用默认模板", exc_info=exc)
-        return {}, {}
+    with toml_path.open("rb") as f:
+        data = tomllib.load(f)
+    defaults = data.get("defaults", {}) or {}
+    templates_raw = data.get("templates", {}) or {}
+    templates = {k.lower(): (v.get("header") or "").strip() for k, v in templates_raw.items()}
+    return defaults, templates
 
 
-def load_job_config(
-    toml_path: Path = _TOML_PATH,
-) -> JobConfig:
+def load_job_config(toml_path: Optional[Path] = None) -> JobConfig:
     """
-    读取 VASP 运行配置，优先级：工作目录 job_templates.local.toml > 用户级 ~/.config/vasp/job_templates.toml > 仓库默认 job_templates.toml。
-    不再读取环境变量覆盖或 ~/.my_scriptrc.py 兼容。
+    读取 VASP 运行配置，仅保留：
+    1) 显式传入的 --config
+    2) 当前工作目录 job_templates.local.toml
+    其他历史兼容路径全部移除。
     """
-    cfg = {}
+    if not tomllib:
+        raise RuntimeError("当前环境缺少 tomllib/tomli，请使用 Python 3.11+ 或安装 tomli")
 
-    # 1) 工作目录本地覆盖
-    if _LOCAL_TOML.exists():
-        defaults, templates = _load_templates_from_toml(_LOCAL_TOML)
-    # 2) 用户级全局
-    elif _USER_TOML.exists():
-        defaults, templates = _load_templates_from_toml(_USER_TOML)
-    # 3) 仓库内默认
-    else:
-        defaults, templates = _load_templates_from_toml(toml_path)
+    cfg: dict[str, Union[str, int]] = {}
+    target = Path(toml_path) if toml_path else (Path.cwd() / "job_templates.local.toml")
+    if not target.exists():
+        raise ValueError(f"未找到配置文件 {target}，请通过 --config 指定或在工作目录提供 job_templates.local.toml")
+
+    defaults, templates = _load_templates_from_toml(target)
 
     if defaults.get("vasp_std"):
         cfg["vasp_std"] = defaults["vasp_std"]
     if defaults.get("vasp_gam"):
         cfg["vasp_gam"] = defaults["vasp_gam"]
-    if defaults.get("potcar_dir"):
-        cfg["potcar_dir"] = defaults["potcar_dir"]
     if defaults.get("mpi_procs"):
         cfg["default_mpi_procs"] = defaults["mpi_procs"]
 
     for queue, header in templates.items():
         if queue == "bash":
-            cfg["bashtitle"] = header or cfg["bashtitle"]
+            cfg["bashtitle"] = header or cfg.get("bashtitle")
         if queue == "slurm":
-            cfg["slurmtitle"] = header or cfg["slurmtitle"]
+            cfg["slurmtitle"] = header or cfg.get("slurmtitle")
         if queue == "pbs":
-            cfg["pbstitle"] = header or cfg["pbstitle"]
+            cfg["pbstitle"] = header or cfg.get("pbstitle")
         if queue == "lsf":
-            cfg["lsftitle"] = header or cfg["lsftitle"]
+            cfg["lsftitle"] = header or cfg.get("lsftitle")
 
     required = ["vasp_std", "vasp_gam"]
     missing = [k for k in required if not cfg.get(k)]
     if missing:
-        raise ValueError(f"job_templates 配置缺少必需字段: {missing}，请在 job_templates.local.toml 或 ~/.config/vasp/job_templates.toml 中补充")
-
-    potcar_dir = Path(cfg["potcar_dir"]) if cfg.get("potcar_dir") else None
+        raise ValueError(f"job_templates 配置缺少必需字段: {missing}，请在 {target} 补全")
 
     return JobConfig(
         vasp_std=str(cfg["vasp_std"]),
         vasp_gam=str(cfg["vasp_gam"]),
-        potcar_dir=potcar_dir,
-        bashtitle=str(cfg["bashtitle"]).strip(),
+        bashtitle=str(cfg.get("bashtitle") or "").strip(),
         slurmtitle=str(cfg["slurmtitle"]).strip() if cfg.get("slurmtitle") else None,
         pbstitle=str(cfg["pbstitle"]).strip() if cfg.get("pbstitle") else None,
         lsftitle=str(cfg["lsftitle"]).strip() if cfg.get("lsftitle") else None,

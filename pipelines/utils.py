@@ -8,7 +8,6 @@ VASP Pipeline工具函数
 """
 
 import logging
-import os
 import shutil
 import math
 from pathlib import Path
@@ -265,33 +264,11 @@ def find_symmetry(poscar: Path, output_dir: Path, symprec: float = 1e-3) -> tupl
 
 def prepare_potcar(
     poscar_file: Path,
-    potcar_dir: Optional[Path],
+    potcar_map: Dict[str, str],
     output_file: Path,
-    potcar_type: str = "PBE",
-    potcar_lib_root: Optional[Path] = None,
 ) -> bool:
     """
-    准备POTCAR文件（用户优先选择）。
-    优先使用当前工作目录下的 potcar_lib 中已选赝势；若缺失则从 potcar_dir 搜索唯一匹配的元素目录复制到 potcar_lib。
-    若找到多个候选或找不到候选，提示用户手动放置到 potcar_lib 后重试。
-
-    Parameters
-    ----------
-    poscar_file : Path
-        POSCAR文件路径
-    potcar_dir : Path
-        POTCAR源库目录（包含各元素的POTCAR文件），可为 None（仅使用现有 potcar_lib）
-    output_file : Path
-        输出的POTCAR文件路径
-    potcar_type : str
-        POTCAR类型：'PBE', 'LDA', 'PW91'等
-    potcar_lib_root : Path, optional
-        赝势缓存目录，默认使用当前工作目录下的 potcar_lib
-
-    Returns
-    -------
-    bool
-        成功返回True
+    按 POSCAR 中的元素顺序拼接 POTCAR，只使用配置文件 [potcar] 段提供的绝对路径。
     """
     try:
         elements = _parse_poscar_elements(poscar_file)
@@ -299,47 +276,23 @@ def prepare_potcar(
             logger.error("未能从 POSCAR 解析元素列表")
             return False
 
-        logger.info(f"从POSCAR读取到元素: {elements}")
-
-        potcar_lib = potcar_lib_root or Path.cwd() / "potcar_lib"
-        potcar_lib.mkdir(parents=True, exist_ok=True)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
 
         potcar_content: List[str] = []
-
         for element in elements:
-            # 1) 先看 potcar_lib 是否已有选定的赝势
-            existing = _locate_potcar_in_lib(potcar_lib, element)
-            if existing:
-                logger.info(f"使用 potcar_lib 中的赝势: {existing}")
-                potcar_content.append(existing.read_text())
-                continue
-
-            # 2) 从 potcar_dir 搜索候选
-            if not potcar_dir:
-                logger.error(f"potcar_lib 缺少 {element}，且未提供 potcar_dir，请将所选 POTCAR 放入 {potcar_lib} 后重试")
+            source = potcar_map.get(element)
+            if not source:
+                logger.error(f"[potcar] 未配置元素 {element} 的 POTCAR 路径")
                 return False
-
-            candidates = _search_potcar_candidates(potcar_dir, element, potcar_type)
-            if len(candidates) == 0:
-                logger.error(f"未找到元素 {element} 的POTCAR，请在 {potcar_lib} 手动放置或检查 potcar_dir")
+            pot_path = Path(source).expanduser()
+            if not pot_path.exists():
+                logger.error(f"POTCAR 路径不存在: {pot_path}")
                 return False
+            potcar_content.append(pot_path.read_text())
 
-            chosen = _prompt_choose_potcar(element, candidates)
-            if not chosen:
-                logger.error(f"未为元素 {element} 选择赝势，已中止")
-                return False
-
-            dest = potcar_lib / element
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(chosen, dest)
-            logger.info(f"已将 {element} 赝势复制到 {dest}，后续重复计算将复用")
-            potcar_content.append(Path(dest).read_text())
-
-        output_file.parent.mkdir(parents=True, exist_ok=True)
         output_file.write_text("".join(potcar_content))
-        logger.info(f"POTCAR已生成: {output_file}")
+        logger.info(f"POTCAR 已生成: {output_file}")
         return True
-
     except Exception as e:
         logger.error(f"准备POTCAR失败: {e}", exc_info=True)
         return False
@@ -358,66 +311,6 @@ def _parse_poscar_elements(poscar_file: Path) -> List[str]:
         return candidates
     except Exception:
         return []
-
-
-def _locate_potcar_in_lib(potcar_lib: Path, element: str) -> Optional[Path]:
-    """
-    在 potcar_lib 中查找指定元素的 POTCAR。
-    支持两种布局：
-      - potcar_lib/Element  (文件)
-      - potcar_lib/Element/POTCAR  (目录+文件)
-    """
-    file_candidate = potcar_lib / element
-    dir_candidate = potcar_lib / element / "POTCAR"
-    if dir_candidate.exists():
-        return dir_candidate
-    if file_candidate.exists():
-        return file_candidate
-    return None
-
-
-def _search_potcar_candidates(potcar_dir: Path, element: str, potcar_type: str) -> List[Path]:
-    """
-    在 potcar_dir 下搜索元素的 POTCAR 候选。
-    匹配规则：目录名以元素符号开头，内部有 POTCAR。
-    """
-    candidates: List[Path] = []
-    base_dir = Path(potcar_dir)
-
-    # 允许 potcar_type/Element/POTCAR 或 Element*/POTCAR
-    search_roots = [base_dir, base_dir / potcar_type] if potcar_type else [base_dir]
-    for root in search_roots:
-        if not root.exists():
-            continue
-        for child in root.iterdir():
-            if child.is_dir() and child.name.lower().startswith(element.lower()):
-                pot_path = child / "POTCAR"
-                if pot_path.exists():
-                    candidates.append(pot_path)
-    return candidates
-
-
-def _prompt_choose_potcar(element: str, candidates: List[Path]) -> Optional[Path]:
-    """
-    交互式选择赝势候选。
-    """
-    if len(candidates) == 1:
-        return candidates[0]
-
-    print(f"\n为元素 {element} 选择赝势（按序号输入，回车默认1）：")
-    for idx, c in enumerate(candidates, 1):
-        print(f"  {idx}. {c}")
-    choice = input("请输入编号：").strip()
-    if choice == "":
-        return candidates[0]
-    try:
-        num = int(choice)
-        if 1 <= num <= len(candidates):
-            return candidates[num - 1]
-    except Exception:
-        pass
-    logger.error("输入无效，未选择赝势")
-    return None
 
 
 def kspacing_to_mesh(poscar_file: Path, kspacing: float) -> Tuple[int, int, int]:

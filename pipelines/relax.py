@@ -5,7 +5,7 @@ from typing import Optional
 
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import prepare_potcar, ensure_poscar, find_symmetry
-from vasp.utils.job import load_job_config, write_job_script, submit_job
+from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
 logger = logging.getLogger(__name__)
 
@@ -21,22 +21,21 @@ class RelaxPipeline(BasePipeline):
         encut: Optional[float] = None,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
-        potcar_dir: Optional[Path] = None,
-        potcar_type: str = "PBE",
         pressure: float = 0.0,
+        potcar_map: Optional[dict[str, str]] = None,
+        job_cfg: Optional[JobConfig] = None,
+        config_path: Optional[Path] = None,
         **kwargs,
     ):
         super().__init__(structure_file, work_dir, pressure=pressure, **kwargs)
 
-        self.job_cfg = load_job_config()
+        self.job_cfg = job_cfg or load_job_config(config_path)
         self.kspacing = kspacing
         self.encut = encut
         self.queue_system = queue_system or "bash"
         self.mpi_procs = mpi_procs
-        default_potcar = self.job_cfg.potcar_dir if self.job_cfg else None
-        self.potcar_dir = Path(potcar_dir) if potcar_dir else default_potcar
-        self.potcar_type = potcar_type
         self.pressure = pressure
+        self.potcar_map = potcar_map or {}
 
         self.relax_dir = self.work_dir / "01_relax"
 
@@ -58,17 +57,16 @@ class RelaxPipeline(BasePipeline):
         self._write_relax_incar(self.relax_dir / "INCAR")
         self._write_kpoints(self.relax_dir / "KPOINTS", self.relax_dir / "POSCAR", self.kspacing)
 
-        if self.potcar_dir:
-            if not prepare_potcar(
-                self.relax_dir / "POSCAR",
-                self.potcar_dir,
-                self.relax_dir / "POTCAR",
-                self.potcar_type,
-            ):
-                logger.error("POTCAR准备失败")
-                return False
-        else:
-            logger.warning("未提供 potcar_dir，请确保已手动准备 POTCAR")
+        if not self.potcar_map:
+            logger.error("缺少 [potcar] 配置，无法生成 POTCAR")
+            return False
+        if not prepare_potcar(
+            self.relax_dir / "POSCAR",
+            self.potcar_map,
+            self.relax_dir / "POTCAR",
+        ):
+            logger.error("POTCAR准备失败")
+            return False
 
         job_script = self._write_job_script(self.relax_dir, "relax")
         if self.prepare_only:

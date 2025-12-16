@@ -20,6 +20,7 @@ from vasp.utils.job import (
     write_job_script,
     submit_job,
     select_job_header,
+    JobConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,11 +55,12 @@ class PropertiesPipeline(BasePipeline):
         plot_dos_type: str = "element",
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
-        potcar_dir: Optional[Path] = None,
-        potcar_type: str = "PBE",
         requested_steps: Optional[List[str]] = None,
         run_relax: bool = True,
         pressure: float = 0.0,
+        potcar_map: Optional[dict[str, str]] = None,
+        job_cfg: Optional[JobConfig] = None,
+        config_path: Optional[Path] = None,
         **kwargs
     ):
         """
@@ -88,10 +90,6 @@ class PropertiesPipeline(BasePipeline):
             队列系统：'slurm', 'pbs', 'bash'
         mpi_procs : int, optional
             mpirun -np 参数，默认取 rc 中的设置或8
-        potcar_dir : Path, optional
-            POTCAR库目录，如果不提供则需要手动准备POTCAR
-        potcar_type : str
-            POTCAR类型：'PBE', 'LDA', 'PW91'等
         requested_steps : List[str], optional
             目标步骤列表，如 ["dos","band"]，会自动补齐依赖
         run_relax : bool
@@ -106,7 +104,7 @@ class PropertiesPipeline(BasePipeline):
             **kwargs,
         )
 
-        self.job_cfg = load_job_config()
+        self.job_cfg = job_cfg or load_job_config(config_path)
         self.kspacing = kspacing
         self.encut = encut
         self.include_elf = include_elf
@@ -119,9 +117,7 @@ class PropertiesPipeline(BasePipeline):
         self.run_relax = run_relax
         self.requested_steps = self._normalize_steps(requested_steps)
         self.pressure = pressure
-        default_potcar = self.job_cfg.potcar_dir if self.job_cfg else None
-        self.potcar_dir = Path(potcar_dir) if potcar_dir else default_potcar
-        self.potcar_type = potcar_type
+        self.potcar_map = potcar_map or {}
 
         # 子目录
         self.relax_dir = self.work_dir / "01_relax"
@@ -238,18 +234,17 @@ class PropertiesPipeline(BasePipeline):
         self._write_kpoints(self.relax_dir / "KPOINTS", self.relax_dir / "POSCAR", self.kspacing)
 
         # 准备POTCAR
-        if self.potcar_dir:
-            from vasp.pipelines.utils import prepare_potcar
-            if not prepare_potcar(
-                self.relax_dir / "POSCAR",
-                self.potcar_dir,
-                self.relax_dir / "POTCAR",
-                self.potcar_type
-            ):
-                logger.error("POTCAR准备失败")
-                return False
-        else:
-            logger.warning("未提供potcar_dir，请确保POTCAR文件已手动准备好")
+        if not self.potcar_map:
+            logger.error("缺少 [potcar] 配置，无法生成 POTCAR")
+            return False
+        from vasp.pipelines.utils import prepare_potcar
+        if not prepare_potcar(
+            self.relax_dir / "POSCAR",
+            self.potcar_map,
+            self.relax_dir / "POTCAR",
+        ):
+            logger.error("POTCAR准备失败")
+            return False
 
         # 提交任务
         job_script = self._write_job_script(self.relax_dir, "relax")
@@ -297,8 +292,18 @@ class PropertiesPipeline(BasePipeline):
         potcar_source = self.relax_dir / "POTCAR"
         if potcar_source.exists():
             shutil.copy(potcar_source, self.scf_dir / "POTCAR")
+        elif self.potcar_map:
+            from vasp.pipelines.utils import prepare_potcar
+            if not prepare_potcar(
+                self.scf_dir / "POSCAR",
+                self.potcar_map,
+                self.scf_dir / "POTCAR",
+            ):
+                logger.error("POTCAR准备失败")
+                return False
         else:
-            logger.warning(f"未找到POTCAR文件: {potcar_source}")
+            logger.error("未找到 relax 阶段 POTCAR，且缺少 [potcar] 映射")
+            return False
 
         # 提交任务
         job_script = self._write_job_script(self.scf_dir, "scf")
