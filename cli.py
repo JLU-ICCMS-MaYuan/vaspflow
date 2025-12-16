@@ -17,6 +17,28 @@ from typing import Dict, Any, Optional, List, Tuple
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# 优先使用当前项目的 vasp 包，避免被其他可编辑安装覆盖
+_PROJECT_ROOT = Path(__file__).resolve().parent
+
+
+class _LocalVaspFinder:
+    @classmethod
+    def find_spec(cls, fullname, path=None, target=None):
+        if fullname == "vasp":
+            init_path = _PROJECT_ROOT / "__init__.py"
+            if init_path.exists():
+                from importlib.util import spec_from_file_location
+
+                return spec_from_file_location(
+                    fullname, init_path, submodule_search_locations=[str(_PROJECT_ROOT)]
+                )
+        return None
+
+
+sys.meta_path.insert(0, _LocalVaspFinder)
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 # 导入Pipeline和Workflow类
 from vasp.pipelines import PropertiesPipeline, PhononPropertiesPipeline, BatchPipeline
 from vasp.pipelines.relax import RelaxPipeline
@@ -894,148 +916,76 @@ def command_combo(args):
 
 
 def create_parser():
-    """创建命令行解析器"""
+    """创建简化命令行解析器：仅输入路径、压强和配置文件。"""
     parser = argparse.ArgumentParser(
         prog='vasp',
-        description='VASP计算命令行工具',
+        description='VASP 组合计算（参数从 JSON 配置读取，仅输入与压强走命令行）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 结构优化
-  vasp relax -i POSCAR -j bash --mpi-procs 8 --submit
-
-  # 自洽/态密度/能带
-  vasp scf  -i POSCAR --submit
-  vasp dos  -i POSCAR --submit
-  vasp band -i POSCAR --submit
-
-  # ELF/COHP/Bader/费米面
-  vasp elf           -i POSCAR --submit
-  vasp cohp          -i POSCAR --submit
-  vasp bader         -i POSCAR --submit
-  vasp fermisurface  -i POSCAR --submit
-
-  # 声子/MD（默认先做 relax）
-  vasp phonon -i POSCAR --supercell 2 2 2 --submit
-  vasp md     -i POSCAR --potim 1 --nsw 200 --submit
-  vasp combo relax phonon dos -i POSCAR --submit
-        """
+  vasp -i POSCAR --config my_config.json -p 0 5
+  vasp -i ./structures --config my_config.json
+        """,
     )
-
-    subparsers = parser.add_subparsers(dest='command', required=True, help='子命令')
-
-    # ========== combo 子命令 ==========
-    combo_parser = subparsers.add_parser('combo', help='多模块组合执行（可串写 relax/phonon/scf/dos/...）')
-    combo_parser.add_argument('modules', nargs='+', choices=MODULES, help='模块列表，按书写顺序执行，自动补齐依赖并并行调度')
-    combo_parser.add_argument('-i', '--input', required=True, help='输入文件或目录')
-    combo_parser.add_argument('--json', help='JSON配置文件路径')
-    combo_parser.add_argument('--tasks', type=int, help='同时运行的最大结构数（默认串行）')
-    combo_parser.add_argument('--kspacing', type=float, help='K点间距')
-    combo_parser.add_argument('--encut', type=float, help='截断能(eV)')
-    combo_parser.add_argument('--supercell', nargs=3, type=int, metavar=('X', 'Y', 'Z'), help='声子超胞，如 2 2 2')
-    combo_parser.add_argument('--method', choices=['disp', 'dfpt'], help='声子计算方法')
-    combo_parser.add_argument('--potim', type=float, help='MD 时间步(fs)')
-    combo_parser.add_argument('--tebeg', type=float, help='MD 起始温度(K)')
-    combo_parser.add_argument('--teend', type=float, help='MD 结束温度(K)')
-    combo_parser.add_argument('--nsw', type=int, help='MD 步数')
-    combo_parser.add_argument('--dos-type', choices=['element', 'spd', 'element_spd'], help='DOS 投影类型')
-    combo_parser.add_argument('--potcar-dir', help='POTCAR库目录')
-    combo_parser.add_argument('--potcar-type', choices=['PBE', 'LDA', 'PW91'], help='POTCAR类型')
-    combo_parser.add_argument('-p', '--pressure', type=float, nargs='+', help='外压(GPa)，可多值')
-    combo_parser.add_argument('--structure-ext', type=str, help='目录输入时的结构后缀过滤，逗号分隔，默认vasp')
-    combo_parser.add_argument('-j', '--job-system', choices=['bash', 'slurm', 'pbs', 'lsf'], help='队列系统')
-    combo_parser.add_argument('--mpi-procs', type=str, help="MPI 启动命令，可为数字(默认 mpirun -np N)或完整前缀，如 'mpirun -np 16' / 'srun -n 16'")
-    combo_parser.add_argument('--submit', action='store_true', help='提交作业（默认仅生成输入和脚本）')
-    combo_parser.set_defaults(func=command_combo)
-
-    # ========== relax 子命令 ==========
-    relax_parser = subparsers.add_parser('relax', help='结构优化')
-    relax_parser.add_argument('-i', '--input', required=True, help='输入文件或目录')
-    relax_parser.add_argument('--json', help='JSON配置文件路径')
-    relax_parser.add_argument('--tasks', type=int, help='同时运行的最大结构数（并行度，默认串行）')
-    relax_parser.add_argument('--kspacing', type=float, help='K点间距')
-    relax_parser.add_argument('--encut', type=float, help='截断能(eV)')
-    relax_parser.add_argument('--potcar-dir', help='POTCAR库目录')
-    relax_parser.add_argument('--potcar-type', choices=['PBE', 'LDA', 'PW91'], help='POTCAR类型')
-    relax_parser.add_argument('-p', '--pressure', type=float, nargs='+', help='外压(GPa)，可多值')
-    relax_parser.add_argument('--structure-ext', type=str, help='目录输入时的结构后缀过滤，逗号分隔，默认vasp')
-    relax_parser.add_argument('-j', '--job-system', choices=['bash', 'slurm', 'pbs', 'lsf'], help='队列系统')
-    relax_parser.add_argument('--mpi-procs', type=str, help="MPI 启动命令，可为数字(默认 mpirun -np N)或完整前缀，如 'mpirun -np 16' / 'srun -n 16'")
-    relax_parser.add_argument('--submit', action='store_true', help='提交作业（默认仅生成输入和脚本）')
-    relax_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING'], help='日志级别')
-    relax_parser.set_defaults(func=command_relax)
-
-    # ========== 性质类子命令（scf/dos/band/elf/cohp/bader/fermisurface） ==========
-    property_commands = [
-        ("scf", "自洽计算", ["scf"]),
-        ("dos", "态密度", ["dos"]),
-        ("band", "能带", ["band"]),
-        ("elf", "ELF", ["elf"]),
-        ("cohp", "COHP", ["cohp"]),
-        ("bader", "Bader 电荷", ["bader"]),
-        ("fermisurface", "费米面", ["fermisurface"]),
-    ]
-    for name, title, modules in property_commands:
-        prop_parser = subparsers.add_parser(name, help=title)
-        _attach_common_property_args(prop_parser)
-        prop_parser.set_defaults(func=command_properties, modules=modules, title=title)
-
-    # ========== phonon 子命令 ==========
-    phonon_parser = subparsers.add_parser('phonon', help='声子性质全流程计算')
-    phonon_parser.add_argument('-i', '--input', required=True, help='输入文件或目录')
-    phonon_parser.add_argument('--json', help='JSON配置文件路径')
-    phonon_parser.add_argument('--tasks', type=int, help='同时运行的最大结构数（并行度，默认串行）')
-    phonon_parser.add_argument('--supercell', nargs=3, type=int, metavar=('X', 'Y', 'Z'), help='超胞大小，如: --supercell 2 2 2')
-    phonon_parser.add_argument('--method', choices=['disp', 'dfpt'], help='声子计算方法')
-    phonon_parser.add_argument('--kspacing', type=float, help='K点间距')
-    phonon_parser.add_argument('--encut', type=float, help='截断能(eV)')
-    phonon_parser.add_argument('--potcar-dir', help='POTCAR库目录')
-    phonon_parser.add_argument('--potcar-type', choices=['PBE', 'LDA', 'PW91'], help='POTCAR类型')
-    phonon_parser.add_argument('-p', '--pressure', type=float, nargs='+', help='外压(GPa)，可多值')
-    phonon_parser.add_argument('--structure-ext', type=str, help='目录输入时的结构后缀过滤，逗号分隔，默认vasp')
-    phonon_parser.add_argument('-j', '--job-system', choices=['bash', 'slurm', 'pbs', 'lsf'], help='队列系统')
-    phonon_parser.add_argument('--mpi-procs', type=str, help="MPI 启动命令，可为数字(默认 mpirun -np N)或完整前缀，如 'mpirun -np 16' / 'srun -n 16'")
-    phonon_parser.add_argument('--submit', action='store_true', help='提交作业（默认仅生成输入和脚本）')
-    phonon_parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING'], help='日志级别')
-    phonon_parser.set_defaults(func=command_phonon)
-
-    # ========== md 子命令 ==========
-    md_parser = subparsers.add_parser('md', help='分子动力学')
-    md_parser.add_argument('-i', '--input', required=True, help='输入文件')
-    md_parser.add_argument('--json', help='JSON配置文件路径')
-    md_parser.add_argument('--potim', type=float, help='时间步长(fs)')
-    md_parser.add_argument('--tebeg', type=float, help='起始温度(K)')
-    md_parser.add_argument('--teend', type=float, help='结束温度(K)')
-    md_parser.add_argument('--nsw', type=int, help='MD步数')
-    md_parser.add_argument('--kspacing', type=float, help='K点间距')
-    md_parser.add_argument('--encut', type=float, help='截断能(eV)')
-    md_parser.add_argument('--potcar-dir', help='POTCAR库目录')
-    md_parser.add_argument('--potcar-type', choices=['PBE', 'LDA', 'PW91'], help='POTCAR类型')
-    md_parser.add_argument('-p', '--pressure', type=float, nargs='+', help='外压(GPa)，可多值')
-    md_parser.add_argument('--structure-ext', type=str, help='目录输入时的结构后缀过滤，逗号分隔，默认vasp')
-    md_parser.add_argument('-j', '--job-system', choices=['bash', 'slurm', 'pbs', 'lsf'], help='队列系统')
-    md_parser.add_argument('--mpi-procs', type=str, help="MPI 启动命令，可为数字(默认 mpirun -np N)或完整前缀，如 'mpirun -np 16' / 'srun -n 16'")
-    md_parser.add_argument('--tasks', type=int, help='同时运行的最大结构数（并行度，默认串行）')
-    md_parser.add_argument('--submit', action='store_true', help='提交作业（默认仅生成输入和脚本）')
-    md_parser.set_defaults(func=command_md)
-
+    parser.add_argument('-i', '--input', required=True, help='输入文件或目录，自动判断批量/单结构')
+    parser.add_argument('-p', '--pressure', type=float, nargs='+', help='外压(GPa)，可多值，覆盖配置文件')
+    parser.add_argument('--config', required=True, help='JSON 配置文件路径（需包含 modules 列表及其他参数）')
     return parser
 
 
 def main():
-    """主入口函数"""
+    """主入口函数：仅接收输入路径、压强与 JSON 配置，其他参数从配置文件读取。"""
     parser = create_parser()
     args = parser.parse_args()
 
-    # 设置日志级别
-    if hasattr(args, 'log_level') and args.log_level:
-        logging.getLogger().setLevel(getattr(logging, args.log_level))
+    config_path = Path(args.config).resolve()
+    if not config_path.exists():
+        logger.error(f"配置文件不存在: {config_path}")
+        sys.exit(1)
 
-    # 执行子命令
-    if hasattr(args, 'func'):
-        args.func(args)
-    else:
-        parser.print_help()
+    config_data = load_json_config(config_path)
+    modules = config_data.get("modules")
+    if not modules:
+        logger.error("配置文件缺少 modules 列表，例如 [\"relax\", \"scf\", \"dos\"]")
+        sys.exit(1)
+    unknown = [m for m in modules if m not in MODULES]
+    if unknown:
+        logger.error(f"配置中的 modules 包含未支持项: {unknown}，可选 {MODULES}")
+        sys.exit(1)
+
+    effective_pressure = args.pressure if args.pressure is not None else config_data.get("pressure")
+    if effective_pressure is None:
+        effective_pressure = [0.0]
+
+    combo_args = argparse.Namespace(
+        modules=modules,
+        json=str(config_path),
+        input=args.input,
+        pressure=effective_pressure,
+        tasks=config_data.get("tasks") or config_data.get("max_workers"),
+        kspacing=config_data.get("kspacing"),
+        encut=config_data.get("encut"),
+        supercell=config_data.get("supercell"),
+        method=config_data.get("method"),
+        potim=config_data.get("potim"),
+        tebeg=config_data.get("tebeg"),
+        teend=config_data.get("teend"),
+        nsw=config_data.get("nsw"),
+        dos_type=config_data.get("dos_type"),
+        potcar_dir=config_data.get("potcar_dir"),
+        potcar_type=config_data.get("potcar_type"),
+        structure_ext=config_data.get("structure_ext"),
+        job_system=config_data.get("job_system"),
+        mpi_procs=config_data.get("mpi_procs"),
+        submit=config_data.get("submit", False),
+        log_level=config_data.get("log_level"),
+        tasks_limit=config_data.get("tasks"),
+    )
+
+    if combo_args.log_level:
+        logging.getLogger().setLevel(getattr(logging, str(combo_args.log_level).upper(), logging.INFO))
+
+    command_combo(combo_args)
 
 
 if __name__ == '__main__':

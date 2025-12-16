@@ -1,19 +1,20 @@
 # VASP 计算工具使用指南
 
 ## 配置与优先级
+- 运行入口已简化：命令行仅接受 `-i/--input`（文件或目录）、`-p/--pressure`（可多值，可省略使用配置）以及 `--config`（必填，指定 JSON）。所有模块与参数由配置文件决定。
 - 程序与赝势来源（高→低）：① 环境变量 `VASP_STD`/`VASP_GAM`、`POTCAR_DIR`、`VASP_MPI_PROCS`，脚本头可用 `JOB_HEADER_BASH/SLURM/PBS/LSF` 覆盖；② `vasp/config/job_templates.toml` 的 `defaults` 与 `templates`（按 bash/slurm/pbs/lsf 定义头）；③ 兼容旧 `~/.my_scriptrc.py` (`vaspstd_path/vaspgam_path/potcar_dir/*title/default_mpi_procs`)；④ 内置默认。
-- 命令行优先：`--potcar-dir/--potcar-type`、`-j/--job-system`、`--mpi-procs`、`--encut`、`--kspacing` 等最高优先级。`vasp/config_example.json` 仅示例，不会自动读取，只有传 `--json config_example.json` 才会加载。
-- 提交方式：`-j/--job-system` 选 `bash/slurm/pbs/lsf`；`--mpi-procs` 可为数字或完整前缀（如 `mpirun -np 16`、`srun -n 16`），未指定取配置或默认 8。
+- 配置优先：模块与参数来自 `--config` 指定的 JSON；命令行仅覆盖输入路径与压强。
 - 赝势管理：优先使用当前工作目录下的 `potcar_lib`（支持 `potcar_lib/元素` 或 `potcar_lib/元素/POTCAR`），若缺元素且提供 `potcar_dir` 则仅在 `potcar_dir`（含 `potcar_type` 子目录）中寻找唯一候选并复制到 `potcar_lib`。若找不到或候选不唯一会报错，请手动将所需 POTCAR 放入 `potcar_lib` 后重试。
 
 ### config_example.json 使用指引
 - 位置：`config_example.json`，可复制为 `my_config.json` 后按实际集群与 POTCAR 路径修改。
-- 加载：在命令中通过 `--json my_config.json` 显式指定，未指定不会自动读取。
-- 优先级：CLI 参数最高，可覆盖文件内的 `potcar_dir/potcar_type/kspacing/encut/job_system/max_workers` 等字段；未提供的字段沿用配置文件或默认值。
+- 加载：在命令中通过 `--config my_config.json` 显式指定，未指定不会自动读取。
+- 配置字段：`modules`（如 `["relax","scf","dos"]`）、`potcar_dir/potcar_type`、`kspacing/encut`、`job_system/mpi_procs`、`tasks/max_workers`、`submit` 等。
+- 优先级：CLI 仅覆盖输入与压强；其余字段以配置为准。
 - 常用示例：
   ```bash
-  vasp relax -i POSCAR --json my_config.json --submit
-  vasp dos   -i ./structures --tasks 4 --json my_config.json
+  vasp -i POSCAR --config my_config.json -p 0 5
+  vasp -i ./structures --config my_config.json
   ```
 - 建议每个项目保存一份定制配置（如队列脚本头、POTCAR 路径），敏感信息勿提交仓库。
 
@@ -34,32 +35,9 @@
 - 批量模式在压强目录下生成 `batch_summary.txt` 汇总成功/失败。
 
 ## 常用示例（自动建目录）
-- 单结构：
-  ```bash
-  vasp relax -i POSCAR -p 0 5 -j slurm --mpi-procs 48 --submit
-  vasp dos   -i POSCAR --submit
-  vasp phonon -i POSCAR --supercell 2 2 2 --method disp --submit
-  vasp md    -i POSCAR --potim 1.0 --tebeg 300 --teend 300 --nsw 200 --submit
-  ```
-- 目录批量 + 并行：
-  ```bash
-  vasp relax -i ./structures --structure-ext vasp,cif --pressure 0 10 --tasks 4 -j slurm
-  vasp band  -i ./structures --tasks 3 --submit
-  ```
-- 多模块组合（自动补齐依赖，relax 后并行调度 phonon 与电子链路）：
-  ```bash
-  vasp combo relax phonon dos -i ./stdlibs/ -p 0 5 -j slurm --encut 600 --kspacing 0.18 --mpi-procs "srun -n 32" --submit
-  vasp combo relax md -i POSCAR --potim 1.0 --nsw 200 --submit
-  ```
+- 建议将 `config_example.json` 复制为 `my_config.json`，填写 `modules`（如 `["relax","scf","dos"]`）、`potcar_dir`、`job_system`、`mpi_procs`、`tasks/max_workers`、`submit` 等。
+- 单结构：`vasp -i POSCAR --config my_config.json -p 0 5`
+- 目录批量 + 多压强：`vasp -i ./structures --config my_config.json -p 0 10`
 - 运行前准备赝势：在当前工作目录创建 `potcar_lib`，放入选定赝势（如 `potcar_lib/Si/POTCAR`）；缺失元素时若提供 `potcar_dir` 会复制唯一匹配项到 `potcar_lib`，否则报错提示手动补齐。
-- 全功能回归示例（覆盖全部子命令与参数形态）：
-  - 基础优化：`vasp relax -i POSCAR -p 0 5 -j slurm --mpi-procs "mpirun -np 32" --submit`
-  - 自洽：`vasp scf -i POSCAR --kspacing 0.2 --encut 520 -j bash --mpi-procs 16 --submit`
-  - DOS/Band/ELF/COHP/Bader/Fermi：`vasp dos -i POSCAR --encut 550 --kspacing 0.18 --mpi-procs "srun -n 48" --submit`；`vasp band -i POSCAR --mpi-procs 32 --submit`；`vasp elf|cohp|bader|fermisurface -i POSCAR --submit`
-  - 声子：`vasp phonon -i POSCAR --supercell 2 2 2 --method disp -j bash --mpi-procs "mpirun -np 24" --submit`
-  - MD：`vasp md -i POSCAR --potim 1.0 --tebeg 300 --teend 300 --nsw 500 -j slurm --mpi-procs 32 --submit`
-  - 批量+多压强：`vasp combo relax scf dos -i ./stdlibs/ -p 0 50 100 --tasks 3 -j slurm --mpi-procs "mpirun -np 16" --submit`
-  - 自定义启动器：`vasp scf -i POSCAR -j slurm --mpi-procs "ibrun -n 64" --submit`
-  - 仅准备：`vasp combo relax phonon dos -i POSCAR --kspacing 0.2 --encut 520 -j bash --mpi-procs 8`
 
-这些命令覆盖单结构/批量、多压强、全部模块、不同队列/启动器字符串、并行 tasks，以及 submit 与 prepare-only 场景。***
+这些命令覆盖单结构/批量、多压强场景；其他参数均在配置文件中维护，更新配置即可复用同一命令。

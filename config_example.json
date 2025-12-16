@@ -2,6 +2,7 @@
   "_comment": "VASP计算通用配置文件示例",
   "_description": "此文件提供默认参数，可被命令行参数覆盖",
 
+  "modules": ["relax", "scf", "dos"],
   "potcar_dir": "~/pot/vasp_pot/potpaw_PBE54",
   "potcar_type": "PBE",
 
@@ -19,5 +20,6 @@
   "supercell": [2, 2, 2],
   "method": "disp",
 
-  "log_level": "INFO"
+  "log_level": "INFO",
+  "submit": false
 }

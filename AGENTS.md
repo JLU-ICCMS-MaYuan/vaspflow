@@ -48,3 +48,4 @@
 - 2025-12-15：添加 `.gitignore` 并清理已跟踪的 `__pycache__/*.pyc` 等构建/缓存产物，避免再次提交；本地工作目录可保留 `test/` 示例结构自测。
 - 2025-12-15：新增 `vasp_cli_entry.py` 与入口脚本映射 `vasp/vaspflow -> vasp_cli_entry:main`，在运行时强制优先加载当前项目的 `vasp` 包，避免与其他同名包冲突导致 CLI 无法导入 pipelines。
 - 2025-12-15：完善 `config_example.json` 使用说明，指导复制为自定义配置并通过 `--json` 显式加载，明确 CLI 覆盖优先级与示例命令。
+- 2025-12-16：简化 CLI，只保留 `-i/--input`、`-p/--pressure` 与 `--config`，模块与其他参数全部由配置文件提供；更新 `config_example.json` 添加 `modules`/`submit`，重写 README 用法说明。
