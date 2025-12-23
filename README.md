@@ -3,7 +3,7 @@
 ## 配置来源（唯一）
 - 仅接受 TOML：工作目录 `job_templates.local.toml`，或通过 `--config` 指定；仓库内 `config/job_templates.toml` 仅作模板不被读取。
 - `[defaults]` 提供 `vasp_std`/`vasp_gam`、`mpi_procs`；`[templates.*]` 为作业脚本头。
-- `[settings]` 收录 `modules`（必填）、`kspacing`/`encut`、`job_system`、`max_workers`、`structure_ext`、`dos_type`、`include_*`、`submit`、`pressure` 等通用参数。
+- `[settings]` 收录 `modules`（必填）、`kspacing`/`encut`、`job_system`、`max_workers`、`structure_ext`、`dos_type`、`submit`、`pressure` 等通用参数。
 - `[phonon]`、`[md]`、`[tasks]` 为专用子段，可覆盖对应参数。
 - `[potcar]` 必填：元素符号 -> POTCAR 绝对路径，程序按 POSCAR 元素顺序拼接。
 

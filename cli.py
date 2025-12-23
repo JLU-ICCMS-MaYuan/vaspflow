@@ -115,10 +115,6 @@ def build_runtime_config(raw: Dict[str, Any], config_path: Path) -> Dict[str, An
     config["tasks"] = tasks_cfg.get("max_workers") or settings.get("max_workers") or settings.get("tasks")
     config["structure_ext"] = settings.get("structure_ext")
     config["dos_type"] = settings.get("dos_type", "element")
-    config["include_elf"] = settings.get("include_elf", False)
-    config["include_cohp"] = settings.get("include_cohp", False)
-    config["include_bader"] = settings.get("include_bader", False)
-    config["include_fermi"] = settings.get("include_fermi", False)
     config["submit"] = settings.get("submit", False)
     config["log_level"] = settings.get("log_level")
 
@@ -211,11 +207,6 @@ def run_properties_command(args, title: str, modules: list[str]):
     tasks = final_config.get("tasks")
     parallel_flag = tasks is not None and tasks > 1
     max_workers = tasks or 1
-    include_elf = "elf" in modules
-    include_cohp = "cohp" in modules
-    include_bader = "bader" in modules
-    include_fermi = "fermisurface" in modules
-
     try:
         for p in pressures:
             pressure_label = format_pressure_dir(p)
@@ -224,10 +215,6 @@ def run_properties_command(args, title: str, modules: list[str]):
             pipeline_kwargs = {
                 "kspacing": final_config.get("kspacing", 0.2),
                 "encut": final_config.get("encut"),
-                "include_elf": include_elf,
-                "include_cohp": include_cohp,
-                "include_bader": include_bader,
-                "include_fermi": include_fermi,
                 "plot_dos_type": final_config.get("dos_type", "element"),
                 "queue_system": final_config.get("job_system"),
                 "mpi_procs": final_config.get("mpi_procs"),
@@ -415,10 +402,6 @@ def _run_combo_pipeline(
             "potcar_map": config.get("potcar_map") or {},
             "job_cfg": config.get("job_cfg"),
             "config_path": config.get("config_path"),
-            "include_elf": config.get("include_elf", False),
-            "include_cohp": config.get("include_cohp", False),
-            "include_bader": config.get("include_bader", False),
-            "include_fermi": config.get("include_fermi", False),
             "dos_type": config.get("dos_type", "element"),
             "supercell": config.get("supercell"),
             "method": config.get("method"),
@@ -845,19 +828,11 @@ def _run_phonon_pipeline(structure_file: Path, work_dir: Path, cfg: Dict[str, An
 
 
 def _run_properties_pipeline(structure_file: Path, work_dir: Path, modules: list[str], cfg: Dict[str, Any], pressure: float):
-    include_elf = "elf" in modules
-    include_cohp = "cohp" in modules
-    include_bader = "bader" in modules
-    include_fermi = "fermisurface" in modules
     pipeline = PropertiesPipeline(
         structure_file=structure_file,
         work_dir=work_dir,
         kspacing=cfg.get("kspacing", 0.2),
         encut=cfg.get("encut"),
-        include_elf=cfg.get("include_elf", include_elf) or include_elf,
-        include_cohp=cfg.get("include_cohp", include_cohp) or include_cohp,
-        include_bader=cfg.get("include_bader", include_bader) or include_bader,
-        include_fermi=cfg.get("include_fermi", include_fermi) or include_fermi,
         plot_dos_type=cfg.get("dos_type", "element"),
         queue_system=cfg.get("job_system"),
         mpi_procs=cfg.get("mpi_procs"),
@@ -952,10 +927,6 @@ def command_combo(args):
             "potcar_map": getattr(args, "potcar_map", {}) or {},
             "job_cfg": getattr(args, "job_cfg", None),
             "config_path": getattr(args, "config_path", None),
-            "include_elf": getattr(args, "include_elf", False),
-            "include_cohp": getattr(args, "include_cohp", False),
-            "include_bader": getattr(args, "include_bader", False),
-            "include_fermi": getattr(args, "include_fermi", False),
             "phonon_structure": getattr(args, "phonon_structure", "primitive"),
         }
         results = _run_matrix_tasks(
@@ -1067,10 +1038,6 @@ def main():
         potcar_map=config_data.get("potcar_map"),
         job_cfg=job_cfg,
         config_path=config_path,
-        include_elf=config_data.get("include_elf", False),
-        include_cohp=config_data.get("include_cohp", False),
-        include_bader=config_data.get("include_bader", False),
-        include_fermi=config_data.get("include_fermi", False),
         phonon_structure=phonon_structure,
     )
 

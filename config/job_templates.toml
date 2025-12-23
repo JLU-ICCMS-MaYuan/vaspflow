@@ -21,10 +21,6 @@ job_system = ""           # 留空则使用 templates 中的首个队列
 max_workers = 2           # 批量/多压强并行度
 structure_ext = "vasp"    # 目录输入时的结构后缀过滤
 dos_type = "element"      # element/spd/element_spd
-include_elf = false
-include_cohp = false
-include_bader = false
-include_fermi = false
 submit = false            # true 时自动提交 run_*.sh
 
 [phonon]

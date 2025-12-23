@@ -48,10 +48,6 @@ class PropertiesPipeline(BasePipeline):
         work_dir: Path,
         kspacing: float = 0.2,
         encut: Optional[float] = None,
-        include_elf: bool = True,
-        include_cohp: bool = True,
-        include_bader: bool = False,
-        include_fermi: bool = False,
         plot_dos_type: str = "element",
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
@@ -76,14 +72,6 @@ class PropertiesPipeline(BasePipeline):
             K点间距（Angstrom^-1）
         encut : float, optional
             平面波截断能（eV），不指定则使用POTCAR推荐值
-        include_elf : bool
-            是否包含ELF计算
-        include_cohp : bool
-            是否包含COHP计算
-        include_bader : bool
-            是否进行 Bader 电荷分析
-        include_fermi : bool
-            是否进行费米面计算
         plot_dos_type : str
             DOS投影类型：'element', 'spd', 'element_spd'
         queue_system : str, optional
@@ -107,10 +95,6 @@ class PropertiesPipeline(BasePipeline):
         self.job_cfg = job_cfg or load_job_config(config_path)
         self.kspacing = kspacing
         self.encut = encut
-        self.include_elf = include_elf
-        self.include_cohp = include_cohp
-        self.include_bader = include_bader
-        self.include_fermi = include_fermi
         self.plot_dos_type = plot_dos_type
         self.queue_system = queue_system or (self.job_cfg.default_queue if self.job_cfg else None)
         if not self.queue_system:
@@ -178,16 +162,6 @@ class PropertiesPipeline(BasePipeline):
         if self.run_relax:
             steps.append("relax")
         steps.append("scf")
-
-        if self.include_elf:
-            steps.append("elf")
-
-        if self.include_cohp:
-            steps.append("cohp")
-        if self.include_bader:
-            steps.append("bader")
-        if self.include_fermi:
-            steps.append("fermisurface")
 
         return steps
 
@@ -535,7 +509,7 @@ class PropertiesPipeline(BasePipeline):
             )
 
             # 绘制ELF（如果有）
-            if self.include_elf and self.elf_dir.exists():
+            if self.elf_dir.exists():
                 try:
                     plotters.plot_elf(
                         self.elf_dir,
@@ -545,7 +519,7 @@ class PropertiesPipeline(BasePipeline):
                     logger.warning(f"ELF绘图失败: {e}")
 
             # 绘制COHP（如果有）
-            if self.include_cohp and self.cohp_dir.exists():
+            if self.cohp_dir.exists():
                 try:
                     plotters.plot_cohp(
                         self.cohp_dir,
