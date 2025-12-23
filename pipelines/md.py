@@ -108,11 +108,6 @@ class MdPipeline(BasePipeline):
             return False
 
         job_script = self._write_job_script(self.relax_dir, "relax")
-
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.relax_dir, job_script)
 
         if not self._wait_for_job(job_id, self.relax_dir, self.queue_system):
@@ -155,11 +150,6 @@ class MdPipeline(BasePipeline):
             return False
 
         job_script = self._write_job_script(self.md_dir, "md")
-
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.md_dir, job_script)
 
         if not self._wait_for_job(job_id, self.md_dir, self.queue_system):

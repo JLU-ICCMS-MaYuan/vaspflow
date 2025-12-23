@@ -202,10 +202,6 @@ class PhononPropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.relax_dir, "relax")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.relax_dir, job_script)
 
         # 等待完成
@@ -318,12 +314,8 @@ class PhononPropertiesPipeline(BasePipeline):
                 self.steps_data["phonon_inputs_ready"] = True
                 self._save_checkpoint()
 
-            if self.prepare_only:
-                logger.info("prepare_only=True，已生成所有位移输入和脚本，不提交。")
-                return True
-
-            # 2) 提交未完成的位移，已完成的跳过
-            pending_jobs: List[tuple[str, Path]] = []
+                # 2) 提交未完成的位移，已完成的跳过
+                pending_jobs: List[tuple[str, Path]] = []
             for i in range(1, n_disp + 1):
                 disp_num = str(i).zfill(3)
                 disp_dir = self.phonon_dir / f"disp-{disp_num}"

@@ -224,10 +224,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.relax_dir, "relax")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.relax_dir, job_script)
 
         # 等待完成
@@ -283,10 +279,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.scf_dir, "scf")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.scf_dir, job_script)
 
         # 等待完成
@@ -323,10 +315,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.dos_dir, "dos")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.dos_dir, job_script)
 
         # 等待完成
@@ -358,10 +346,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.band_dir, "band")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.band_dir, job_script)
 
         # 等待完成
@@ -390,10 +374,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.elf_dir, "elf")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.elf_dir, job_script)
 
         # 等待完成
@@ -421,10 +401,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 提交任务
         job_script = self._write_job_script(self.cohp_dir, "cohp")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.cohp_dir, job_script)
 
         # 等待完成
@@ -450,10 +426,6 @@ class PropertiesPipeline(BasePipeline):
 
         # 写入脚本：调用 bader
         script_path = self._write_bader_script(self.bader_dir)
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.bader_dir, script_path)
 
         if not self._wait_for_job(job_id, self.bader_dir, self.queue_system):
@@ -476,10 +448,6 @@ class PropertiesPipeline(BasePipeline):
         self._write_band_kpoints(self.fermi_dir / "KPOINTS")
 
         job_script = self._write_job_script(self.fermi_dir, "fermi")
-        if self.prepare_only:
-            logger.info("prepare_only=True，仅生成输入和脚本，不提交。")
-            return True
-
         job_id = self._submit_job(self.fermi_dir, job_script)
 
         if not self._wait_for_job(job_id, self.fermi_dir, self.queue_system):

@@ -223,6 +223,8 @@ class BasePipeline(ABC):
                 success = self.execute_step(step_name)
 
                 if success:
+                    self.steps_status[step_name] = StepStatus.COMPLETED
+                    self._save_checkpoint()
                     return True
                 else:
                     logger.warning(f"步骤 '{step_name}' 执行失败")
