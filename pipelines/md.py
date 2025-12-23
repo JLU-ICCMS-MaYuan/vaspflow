@@ -57,7 +57,7 @@ class MdPipeline(BasePipeline):
     def get_steps(self):
         if self.custom_steps:
             return self.custom_steps
-        return ["relax", "md"]
+        return ["relax", "md"] if self.include_relax else ["md"]
 
     def execute_step(self, step_name: str) -> bool:
         if step_name == "relax":
