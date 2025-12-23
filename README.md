@@ -23,7 +23,7 @@
 - 缺失元素或路径不存在将直接报错，请先在配置中补全；无需交互选择。
 
 ## 目录与产物（概览）
-- 单结构：`<stem>/<pressure>_GPa/01_relax -> 02_scf -> ...`；批量目录下按文件名分组。
+- 单结构：`<stem>/<pressure>/01_relax -> 02_scf -> ...`（压强目录名为压力数值），批量目录下按文件名分组。
 - 每个步骤输出 `pipeline_checkpoint.json`、`pipeline_report.txt` 与 `run_*.sh`，完成后写 `finished` 标记。
 - 重复运行会基于产物检查决定跳过/重跑；prepare_only 模式仅生成输入不提交。
 

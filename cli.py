@@ -144,7 +144,7 @@ def build_runtime_config(raw: Dict[str, Any], config_path: Path) -> Dict[str, An
 
 
 def format_pressure_dir(pressure: float) -> str:
-    return f"{pressure:g}_GPa"
+    return f"{pressure:g}"
 
 
 def derive_work_root(input_path: Path) -> Path:

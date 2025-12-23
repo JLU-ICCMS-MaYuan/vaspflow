@@ -39,6 +39,7 @@
 - `[defaults].mpi_cmd/mpi_procs` 支持数字或完整命令（如 `"mpirun -np 48"` / `"srun"`），可被 `--mpi-procs` 覆盖；缺省则回退 `mpirun -np 8`。
 - `[potcar]` 必填：元素 -> POTCAR 绝对路径；缺失元素或路径不存在会直接报错，不再支持 potcar_dir/potcar_lib 搜索。
 - `[phonon].structure` 新增开关：primitive（默认）/conventional/relaxed，缺少对应结构会报错。
+- 压强目录命名为压力数值（不再带 `_GPa` 后缀），便于与上游目录对齐。
 - 调整队列模板时勿提交真实账号路径；批量任务先用少量结构自检，关注 `pipeline.log` 与 `pipeline_report.txt`。
 - 产出目录包含 `pipeline_checkpoint.json`/`pipeline_report.txt`/`finished` 标记，可用于排查；异常时先查 `VASP_error_collecting.md`，再最小化复现场景。 
 
