@@ -239,13 +239,8 @@ def find_symmetry(poscar: Path, output_dir: Path, symprec: float = 1e-3) -> tupl
         prim_lat, prim_pos, prim_num = spglib.find_primitive(cell, symprec=symprec)
         std_lat, std_pos, std_num = spglib.standardize_cell(cell, symprec=symprec)
 
-        prim_atoms = ase_read(poscar)
-        prim_atoms.set_cell(prim_lat, scale_atoms=False)
-        prim_atoms.set_scaled_positions(prim_pos)
-
-        std_atoms = ase_read(poscar)
-        std_atoms.set_cell(std_lat, scale_atoms=False)
-        std_atoms.set_scaled_positions(std_pos)
+        prim_atoms = Atoms(cell=prim_lat, scaled_positions=prim_pos, numbers=prim_num)
+        std_atoms = Atoms(cell=std_lat, scaled_positions=std_pos, numbers=std_num)
 
         output_dir.mkdir(parents=True, exist_ok=True)
         prim_path = output_dir / "POSCAR_primitive"
