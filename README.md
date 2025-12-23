@@ -29,3 +29,9 @@
 
 ## 声子结构开关
 - `[phonon].structure` 决定声子计算使用的结构：`primitive`（默认，原胞）、`conventional`（标准晶胞）或 `relaxed`（CONTCAR）。若选定结构不存在将报错。
+
+## 复用与断点技能卡
+- 配置唯一：仅读 `job_templates.local.toml`（或 `--config` 指定），首个 `[templates.<queue>]` 决定队列和脚本头；POTCAR 仅按 `[potcar]` 映射，缺元素直接报错。
+- 模块驱动：执行步骤完全由 `[settings].modules` 决定，prepare_only 由 `submit=false` 驱动；压强目录以数值命名。
+- relax 复用：进入 `01_relax` 时先检测 OUTCAR 是否收敛，收敛则标记完成并复用 CONTCAR（生成原胞/标准晶胞），未收敛则仅准备 relax 输入（prepare_only 下不提交）。
+- 队列模板：只使用首个模板，若需 slurm/pbs/lsf，请将对应 `[templates.*]` 放在文件最前或只保留该项；MPI 启动可写数字或完整命令。
