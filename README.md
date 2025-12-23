@@ -16,7 +16,7 @@
 ## 作业脚本与可执行
 - VASP 可执行路径与队列头只读自当前配置文件；不再支持环境变量或用户级配置。
 - `[templates]` 仅读取首个定义的队列头（如 `templates.slurm`），其余忽略；若未定义任何模板将直接报错。未显式写 `job_system` 时默认使用首个模板的队列；若指定的队列无对应模板也会报错。
-- MPI 进程数默认用 `[defaults].mpi_procs`，可被 `mpi_procs` 覆盖。
+- MPI 启动默认用 `[defaults].mpi_cmd/mpi_procs`：可写数字（`8`，生成 `mpirun -np 8`）或完整命令（如 `"mpirun -np 48"`、`"srun"`），`--mpi-procs` 可覆盖。
 
 ## POTCAR 处理
 - 不再搜索 `potcar_dir` 或 `potcar_lib`。程序仅使用 `[potcar]` 映射，按 POSCAR 中的元素顺序拼接成 POTCAR。

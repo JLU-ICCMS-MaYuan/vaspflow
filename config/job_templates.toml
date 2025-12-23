@@ -6,7 +6,8 @@
 vasp_std = "/home/mayuan/soft/vasp.6.3.2/bin/vasp_std"
 vasp_gam = "/home/mayuan/soft/vasp.6.3.2/bin/vasp_gam"
 # 默认 MPI 进程数（未指定 --mpi-procs 时使用）
-mpi_procs = 8
+# 可写数字 (8) 或完整命令 ("mpirun -np 48" / "srun")
+mpi_cmd = "mpirun -np 48"
 
 [settings]
 # 必填：模块列表，按顺序执行

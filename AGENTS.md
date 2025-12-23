@@ -36,6 +36,7 @@
 ## 配置与安全提示
 - 配置来源唯一：`--config` 指定的 TOML 或当前目录 `job_templates.local.toml`；不再读取环境变量、用户级配置或仓库模板。
 - `[templates]` 仅使用首个定义的队列头；如果既未定义模板又设置了 job_system，将报错，请至少提供一个 `[templates.<queue>]`。
+- `[defaults].mpi_cmd/mpi_procs` 支持数字或完整命令（如 `"mpirun -np 48"` / `"srun"`），可被 `--mpi-procs` 覆盖；缺省则回退 `mpirun -np 8`。
 - `[potcar]` 必填：元素 -> POTCAR 绝对路径；缺失元素或路径不存在会直接报错，不再支持 potcar_dir/potcar_lib 搜索。
 - `[phonon].structure` 新增开关：primitive（默认）/conventional/relaxed，缺少对应结构会报错。
 - 调整队列模板时勿提交真实账号路径；批量任务先用少量结构自检，关注 `pipeline.log` 与 `pipeline_report.txt`。

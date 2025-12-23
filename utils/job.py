@@ -29,7 +29,7 @@ class JobConfig:
     slurmtitle: Optional[str]
     pbstitle: Optional[str]
     lsftitle: Optional[str]
-    default_mpi_procs: int = 8
+    default_mpi_procs: Union[int, str] = 8
     default_queue: str = "bash"
 
 
@@ -69,6 +69,8 @@ def load_job_config(toml_path: Optional[Path] = None) -> JobConfig:
         cfg["vasp_gam"] = defaults["vasp_gam"]
     if defaults.get("mpi_procs"):
         cfg["default_mpi_procs"] = defaults["mpi_procs"]
+    if defaults.get("mpi_cmd"):
+        cfg["default_mpi_procs"] = defaults["mpi_cmd"]
 
     if not templates:
         raise ValueError("配置缺少 [templates]，请至少定义一个队列脚本头（如 [templates.slurm]）")
@@ -99,7 +101,7 @@ def load_job_config(toml_path: Optional[Path] = None) -> JobConfig:
         slurmtitle=str(cfg["slurmtitle"]).strip() if cfg.get("slurmtitle") else None,
         pbstitle=str(cfg["pbstitle"]).strip() if cfg.get("pbstitle") else None,
         lsftitle=str(cfg["lsftitle"]).strip() if cfg.get("lsftitle") else None,
-        default_mpi_procs=int(cfg.get("default_mpi_procs") or 8),
+        default_mpi_procs=cfg.get("default_mpi_procs") or 8,
         default_queue=str(cfg.get("default_queue") or "bash"),
     )
 
@@ -139,8 +141,12 @@ def write_job_script(
     # 支持字符串或数字：字符串直接作为启动命令前缀，数字走 mpirun -np
     run_line: str
     if mpi_procs is None:
-        mpi = cfg.default_mpi_procs or 8
-        run_line = f"mpirun -np {mpi} {binary} > vasp.log"
+        mpi_default = cfg.default_mpi_procs
+        if isinstance(mpi_default, str):
+            run_line = f"{mpi_default} {binary} > vasp.log"
+        else:
+            mpi = mpi_default or 8
+            run_line = f"mpirun -np {mpi} {binary} > vasp.log"
     elif isinstance(mpi_procs, str):
         mpi_str = mpi_procs.strip()
         if mpi_str.isdigit():
