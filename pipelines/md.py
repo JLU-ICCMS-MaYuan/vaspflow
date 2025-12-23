@@ -144,18 +144,15 @@ class MdPipeline(BasePipeline):
         self._write_md_incar(self.md_dir / "INCAR")
         self._write_kpoints(self.md_dir / "KPOINTS", self.md_dir / "POSCAR", self.kspacing)
 
-        if self.include_relax and self.relax_dir and (self.relax_dir / "POTCAR").exists():
-            shutil.copy(self.relax_dir / "POTCAR", self.md_dir / "POTCAR")
-        elif self.potcar_map:
-            if not prepare_potcar(
-                self.md_dir / "POSCAR",
-                self.potcar_map,
-                self.md_dir / "POTCAR",
-            ):
-                logger.error("POTCAR准备失败")
+        if self.include_relax:
+            if self.relax_dir and check_vasp_completion(self.relax_dir) and (self.relax_dir / "POTCAR").exists():
+                shutil.copy(self.relax_dir / "POTCAR", self.md_dir / "POTCAR")
+            else:
+                logger.error("未检测到已收敛的 relax，MD 不允许启动")
                 return False
         else:
-            logger.error("缺少 POTCAR，请在 [potcar] 中配置所有元素的路径")
+            logger.error("未启用 relax，MD 不允许启动")
+            return False
 
         job_script = self._write_job_script(self.md_dir, "md")
 
