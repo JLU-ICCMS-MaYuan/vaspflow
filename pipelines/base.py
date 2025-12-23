@@ -283,6 +283,12 @@ class BasePipeline(ABC):
                 logger.info(f"任务完成！耗时: {elapsed:.0f}秒")
                 return True
 
+            # bash 模式下若长时间无 OUTCAR，视为失败，避免无进程时无限等待
+            if (queue_system or "").lower() == "bash":
+                if elapsed > 120 and not (work_path / "OUTCAR").exists():
+                    logger.error("bash 运行未生成 OUTCAR，任务可能未启动或已异常退出")
+                    return False
+
             # 队列状态检查（非bash）
             active = is_job_active(job_id, queue_system)
             if active is False:
