@@ -316,7 +316,7 @@ class BasePipeline(ABC):
         bool
             完成返回True
         """
-        # 检查OUTCAR文件中是否有"reached required accuracy"
+        # 检查OUTCAR文件中是否有结束标记
         outcar = work_path / "OUTCAR"
 
         if not outcar.exists():
@@ -326,8 +326,14 @@ class BasePipeline(ABC):
             with open(outcar, 'r') as f:
                 content = f.read()
 
-            # 检查是否正常结束
-            if "reached required accuracy" in content or "writing wavefunctions" in content:
+            # 结构优化结束标志
+            if "reached required accuracy" in content:
+                return True
+            # SCF/DOS 等结束标志（EDIFF 达到）
+            if "aborting loop because EDIFF is reached" in content:
+                return True
+            # 一些版本在退出时写 wavefunctions
+            if "writing wavefunctions" in content:
                 return True
 
         except Exception as e:
