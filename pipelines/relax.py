@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from vasp.pipelines.base import BasePipeline
-from vasp.pipelines.utils import prepare_potcar, ensure_poscar, find_symmetry
+from vasp.pipelines.utils import prepare_potcar, ensure_poscar, find_symmetry, check_vasp_completion
 from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,24 @@ class RelaxPipeline(BasePipeline):
         logger.info("执行结构优化...")
 
         self.relax_dir.mkdir(parents=True, exist_ok=True)
+
+        # 若已有收敛结果，直接复用，不重复准备
+        if check_vasp_completion(self.relax_dir):
+            logger.info("检测到已有收敛的 relax 结果，直接复用")
+            contcar = self.relax_dir / "CONTCAR"
+            if contcar.exists():
+                relaxed = self.work_dir / "POSCAR_relaxed"
+                shutil.copy(contcar, relaxed)
+                self.steps_data["relaxed_structure"] = str(relaxed)
+                prim, std, sg = find_symmetry(relaxed, self.work_dir, symprec=1e-3)
+                if prim:
+                    self.steps_data["primitive_structure"] = str(prim)
+                if std:
+                    self.steps_data["conventional_structure"] = str(std)
+                if sg:
+                    self.steps_data["spacegroup"] = sg
+            return True
+
         ensure_poscar(self.structure_file, self.relax_dir / "POSCAR")
 
         self._write_relax_incar(self.relax_dir / "INCAR")
