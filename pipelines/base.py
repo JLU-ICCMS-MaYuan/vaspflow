@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
+from vasp.pipelines import defaults as dft
 from vasp.utils.job import is_job_active
 
 logger = logging.getLogger(__name__)
@@ -82,10 +83,10 @@ class BasePipeline(ABC):
         if not self.structure_file.exists():
             raise FileNotFoundError(f"结构文件不存在: {self.structure_file}")
 
-        default_checkpoint = self.work_dir / f"{self.__class__.__name__.replace('Pipeline', '').lower()}_checkpoint.json"
+        default_checkpoint = self.work_dir / dft.DEFAULT_GENERIC_CHECKPOINT_NAME
         self.checkpoint_file = checkpoint_file or default_checkpoint
-        self._legacy_checkpoint_file = self.work_dir / "pipeline_checkpoint.json"
-        self.report_file = report_file or self.work_dir / "pipeline_report.txt"
+        self._legacy_checkpoint_file = self.work_dir / dft.DEFAULT_GENERIC_CHECKPOINT_NAME
+        self.report_file = report_file or self.work_dir / dft.DEFAULT_REPORT_NAME
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.prepare_only = prepare_only

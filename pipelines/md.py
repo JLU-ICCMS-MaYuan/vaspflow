@@ -5,6 +5,7 @@ from typing import Optional, List
 
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import prepare_potcar, ensure_poscar, check_vasp_completion
+from vasp.pipelines import defaults as dft
 from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,11 @@ class MdPipeline(BasePipeline):
         self,
         structure_file: Path,
         work_dir: Path,
-        potim: float = 1.0,
-        tebeg: float = 300.0,
-        teend: float = 300.0,
-        nsw: int = 200,
-        kspacing: float = 0.2,
+        potim: float = dft.DEFAULT_MD["potim"],
+        tebeg: float = dft.DEFAULT_MD["tebeg"],
+        teend: float = dft.DEFAULT_MD["teend"],
+        nsw: int = dft.DEFAULT_MD["nsw"],
+        kspacing: float = dft.DEFAULT_KSPACING,
         encut: Optional[float] = None,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
@@ -182,10 +183,10 @@ class MdPipeline(BasePipeline):
             f.write("# Molecular Dynamics INCAR\n")
             f.write("SYSTEM = MD Simulation\n\n")
             f.write("PREC = Accurate\n")
-            f.write(f"ENCUT = {self.encut if self.encut else 520}\n")
-            f.write("EDIFF = 1E-6\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.05\n\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_MD['encut']}\n")
+            f.write(f"EDIFF = {dft.DEFAULT_MD['ediff']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_MD['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_MD['sigma']}\n\n")
             f.write("IBRION = 0\n")
             f.write("MDALGO = 2\n")
             f.write(f"NSW = {self.nsw}\n")
@@ -202,15 +203,15 @@ class MdPipeline(BasePipeline):
         with open(incar_file, "w") as f:
             f.write("# Relaxation for MD\n")
             f.write("SYSTEM = Relax before MD\n\n")
-            f.write("PREC = Accurate\n")
-            f.write(f"ENCUT = {self.encut if self.encut else 520}\n")
-            f.write("EDIFF = 1E-6\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.05\n")
-            f.write("IBRION = 2\n")
-            f.write("NSW = 120\n")
-            f.write("ISIF = 3\n")
-            f.write("EDIFFG = -0.02\n")
+            f.write(f"PREC = {dft.DEFAULT_MD_RELAX['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_MD_RELAX['encut']}\n")
+            f.write(f"EDIFF = {dft.DEFAULT_MD_RELAX['ediff']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_MD_RELAX['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_MD_RELAX['sigma']}\n")
+            f.write(f"IBRION = {dft.DEFAULT_MD_RELAX['ibrion']}\n")
+            f.write(f"NSW = {dft.DEFAULT_MD_RELAX['nsw']}\n")
+            f.write(f"ISIF = {dft.DEFAULT_MD_RELAX['isif']}\n")
+            f.write(f"EDIFFG = {dft.DEFAULT_MD_RELAX['ediffg']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
             f.write("LWAVE = .FALSE.\n")
             f.write("LCHARG = .FALSE.\n")

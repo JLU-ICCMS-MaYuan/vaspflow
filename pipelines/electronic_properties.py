@@ -14,6 +14,7 @@ from typing import Optional, List
 
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import ensure_poscar
+from vasp.pipelines import defaults as dft
 from vasp.analysis import plotters
 from vasp.utils.job import (
     load_job_config,
@@ -46,9 +47,9 @@ class PropertiesPipeline(BasePipeline):
         self,
         structure_file: Path,
         work_dir: Path,
-        kspacing: float = 0.2,
+        kspacing: float = dft.DEFAULT_KSPACING,
         encut: Optional[float] = None,
-        plot_dos_type: str = "element",
+        plot_dos_type: str = dft.DEFAULT_DOS_TYPE,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
         requested_steps: Optional[List[str]] = None,
@@ -578,90 +579,90 @@ class PropertiesPipeline(BasePipeline):
             f.write("# Relaxation INCAR\n")
             f.write("SYSTEM = Structure Relaxation\n\n")
             f.write("# Electronic\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("EDIFF = 1E-6\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.05\n\n")
+            f.write(f"PREC = {dft.DEFAULT_RELAX_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"EDIFF = {dft.DEFAULT_RELAX_INCAR['ediff']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_RELAX_INCAR['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_RELAX_INCAR['sigma']}\n\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n\n")
             f.write("# Ionic\n")
             f.write("IBRION = 2\n")
-            f.write("NSW = 200\n")
-            f.write("ISIF = 3\n")
-            f.write("EDIFFG = -0.01\n\n")
+            f.write(f"NSW = {dft.DEFAULT_RELAX_INCAR['nsw']}\n")
+            f.write(f"ISIF = {dft.DEFAULT_RELAX_INCAR['isif']}\n")
+            f.write(f"EDIFFG = {dft.DEFAULT_RELAX_INCAR['ediffg']}\n\n")
             f.write("# Output\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .TRUE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_RELAX_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_RELAX_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_scf_incar(self, incar_file: Path):
         """写入SCF INCAR"""
         with open(incar_file, 'w') as f:
             f.write("# SCF INCAR\n")
             f.write("SYSTEM = Self-Consistent Calculation\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("EDIFF = 1E-8\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.05\n")
+            f.write(f"PREC = {dft.DEFAULT_SCF_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"EDIFF = {dft.DEFAULT_SCF_INCAR['ediff']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_SCF_INCAR['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_SCF_INCAR['sigma']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .TRUE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_SCF_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_SCF_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_dos_incar(self, incar_file: Path):
         """写入DOS INCAR"""
         with open(incar_file, 'w') as f:
             f.write("# DOS INCAR\n")
             f.write("SYSTEM = DOS Calculation\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("ICHARG = 11\n")
-            f.write("ISMEAR = -5\n")
-            f.write("LORBIT = 11\n")
-            f.write("NEDOS = 2000\n")
+            f.write(f"PREC = {dft.DEFAULT_DOS_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"ICHARG = {dft.DEFAULT_DOS_INCAR['icharg']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_DOS_INCAR['ismear']}\n")
+            f.write(f"LORBIT = {dft.DEFAULT_DOS_INCAR['lorbit']}\n")
+            f.write(f"NEDOS = {dft.DEFAULT_DOS_INCAR['nedos']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .FALSE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_DOS_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_DOS_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_band_incar(self, incar_file: Path):
         """写入能带INCAR"""
         with open(incar_file, 'w') as f:
             f.write("# Band Structure INCAR\n")
             f.write("SYSTEM = Band Structure\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("ICHARG = 11\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.05\n")
-            f.write("LORBIT = 11\n")
+            f.write(f"PREC = {dft.DEFAULT_BAND_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"ICHARG = {dft.DEFAULT_BAND_INCAR['icharg']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_BAND_INCAR['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_BAND_INCAR['sigma']}\n")
+            f.write(f"LORBIT = {dft.DEFAULT_BAND_INCAR['lorbit']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .FALSE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_BAND_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_BAND_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_elf_incar(self, incar_file: Path):
         """写入ELF INCAR"""
         with open(incar_file, 'w') as f:
             f.write("# ELF INCAR\n")
             f.write("SYSTEM = ELF Calculation\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("ICHARG = 11\n")
+            f.write(f"PREC = {dft.DEFAULT_ELF_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"ICHARG = {dft.DEFAULT_ELF_INCAR['icharg']}\n")
             f.write("LELF = .TRUE.\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .FALSE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_ELF_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_ELF_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_cohp_incar(self, incar_file: Path):
         """写入COHP INCAR"""
         with open(incar_file, 'w') as f:
             f.write("# COHP INCAR\n")
             f.write("SYSTEM = COHP Calculation\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("ISMEAR = -5\n")
-            f.write("LORBIT = 11\n")
+            f.write(f"PREC = {dft.DEFAULT_COHP_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_COHP_INCAR['ismear']}\n")
+            f.write(f"LORBIT = {dft.DEFAULT_COHP_INCAR['lorbit']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .FALSE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_COHP_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_COHP_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_kpoints(self, kpoints_file: Path, poscar_file: Path, kspacing: float):
         """写入自动K点（由KSPACING计算网格数）。"""
@@ -695,15 +696,15 @@ class PropertiesPipeline(BasePipeline):
         with open(incar_file, 'w') as f:
             f.write("# Fermi Surface INCAR\n")
             f.write("SYSTEM = Fermi Surface\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("ICHARG = 11\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.05\n")
-            f.write("LORBIT = 11\n")
+            f.write(f"PREC = {dft.DEFAULT_FERMI_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_ENCUT}\n")
+            f.write(f"ICHARG = {dft.DEFAULT_FERMI_INCAR['icharg']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_FERMI_INCAR['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_FERMI_INCAR['sigma']}\n")
+            f.write(f"LORBIT = {dft.DEFAULT_FERMI_INCAR['lorbit']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
-            f.write("LWAVE = .FALSE.\n")
-            f.write("LCHARG = .FALSE.\n")
+            f.write(f"LWAVE = {'.TRUE.' if dft.DEFAULT_FERMI_INCAR['lwav'] else '.FALSE.'}\n")
+            f.write(f"LCHARG = {'.TRUE.' if dft.DEFAULT_FERMI_INCAR['lcharg'] else '.FALSE.'}\n")
 
     def _write_job_script(self, work_dir: Path, job_name: str) -> str:
         """写入任务提交脚本（支持 bash/slurm/pbs/lsf）"""

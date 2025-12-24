@@ -50,6 +50,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from vasp.pipelines import PropertiesPipeline, PhononPropertiesPipeline, BatchPipeline
 from vasp.pipelines.relax import RelaxPipeline
 from vasp.pipelines.md import MdPipeline
+from vasp.pipelines import defaults as dft
 from vasp.pipelines.utils import validate_structure_file
 from vasp.utils.job import load_job_config
 
@@ -106,24 +107,24 @@ def build_runtime_config(raw: Dict[str, Any], config_path: Path) -> Dict[str, An
     potcar_map = raw.get("potcar", {}) or {}
 
     config: Dict[str, Any] = {}
-    config["modules"] = settings.get("modules") or []
-    config["pressure"] = settings.get("pressure")
-    config["kspacing"] = settings.get("kspacing")
-    config["encut"] = settings.get("encut")
-    config["mpi_procs"] = settings.get("mpi_procs")
-    config["tasks"] = tasks_cfg.get("max_workers") or settings.get("max_workers") or settings.get("tasks")
-    config["structure_ext"] = settings.get("structure_ext")
-    config["dos_type"] = settings.get("dos_type", "element")
-    config["submit"] = settings.get("submit", False)
+    config["modules"] = settings.get("modules") or dft.DEFAULT_MODULES
+    config["pressure"] = settings.get("pressure", dft.DEFAULT_PRESSURES)
+    config["kspacing"] = settings.get("kspacing", dft.DEFAULT_KSPACING)
+    config["encut"] = settings.get("encut", dft.DEFAULT_ENCUT)
+    config["mpi_procs"] = settings.get("mpi_procs", dft.DEFAULT_MPI_PROCS)
+    config["tasks"] = tasks_cfg.get("max_workers") or settings.get("max_workers") or settings.get("tasks") or dft.DEFAULT_MAX_WORKERS
+    config["structure_ext"] = settings.get("structure_ext", dft.DEFAULT_STRUCTURE_EXT)
+    config["dos_type"] = settings.get("dos_type", dft.DEFAULT_DOS_TYPE)
+    config["submit"] = settings.get("submit", dft.DEFAULT_SUBMIT)
     config["log_level"] = settings.get("log_level")
 
     # 专用子段
-    config["supercell"] = phonon_cfg.get("supercell") or settings.get("supercell")
-    config["method"] = phonon_cfg.get("method") or settings.get("method")
-    config["potim"] = md_cfg.get("potim") or settings.get("potim")
-    config["tebeg"] = md_cfg.get("tebeg") or settings.get("tebeg")
-    config["teend"] = md_cfg.get("teend") or settings.get("teend")
-    config["nsw"] = md_cfg.get("nsw") or settings.get("nsw")
+    config["supercell"] = phonon_cfg.get("supercell") or settings.get("supercell") or dft.DEFAULT_PHONON_SUPERCELL
+    config["method"] = phonon_cfg.get("method") or settings.get("method") or dft.DEFAULT_PHONON_METHOD
+    config["potim"] = md_cfg.get("potim") or settings.get("potim") or dft.DEFAULT_MD["potim"]
+    config["tebeg"] = md_cfg.get("tebeg") or settings.get("tebeg") or dft.DEFAULT_MD["tebeg"]
+    config["teend"] = md_cfg.get("teend") or settings.get("teend") or dft.DEFAULT_MD["teend"]
+    config["nsw"] = md_cfg.get("nsw") or settings.get("nsw") or dft.DEFAULT_MD["nsw"]
 
     potcar_root = config_path.parent
     resolved_map: Dict[str, str] = {}
@@ -133,7 +134,7 @@ def build_runtime_config(raw: Dict[str, Any], config_path: Path) -> Dict[str, An
             path_obj = (potcar_root / path_obj).resolve()
         resolved_map[k] = str(path_obj)
     config["potcar_map"] = resolved_map
-    config["phonon_structure"] = (phonon_cfg.get("structure") or "primitive").lower()
+    config["phonon_structure"] = (phonon_cfg.get("structure") or dft.DEFAULT_PHONON_STRUCTURE).lower()
     config["config_path"] = config_path
     return config
 

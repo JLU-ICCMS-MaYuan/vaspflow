@@ -5,6 +5,7 @@ from typing import Optional
 
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import prepare_potcar, ensure_poscar, find_symmetry, check_vasp_completion
+from vasp.pipelines import defaults as dft
 from vasp.utils.job import load_job_config, submit_job, JobConfig, select_job_header
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class RelaxPipeline(BasePipeline):
         self,
         structure_file: Path,
         work_dir: Path,
-        kspacing: float = 0.2,
+        kspacing: float = dft.DEFAULT_KSPACING,
         encut: Optional[float] = None,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
@@ -30,7 +31,7 @@ class RelaxPipeline(BasePipeline):
         super().__init__(
             structure_file,
             work_dir,
-            checkpoint_file=Path(work_dir) / "relax_checkpoint.json",
+            checkpoint_file=Path(work_dir) / dft.DEFAULT_RELAX_CHECKPOINT_NAME,
             pressure=pressure,
             **kwargs,
         )
@@ -130,76 +131,21 @@ class RelaxPipeline(BasePipeline):
 
     def _write_relax_incar_set(self, work_dir: Path) -> None:
         """生成四阶段优化的 INCAR_1..4。"""
-        params = [
-            {
-                "suffix": "1",
-                "encut": 300,
-                "prec": "Normal",
-                "kspacing": 0.8,
-                "sigma": 0.2,
-                "ediff": "1e-3",
-                "ediffg": "-0.2",
-                "nsw": 100,
-                "ibrion": 2,
-                "isif": 2,
-                "potim": 0.3,
-            },
-            {
-                "suffix": "2",
-                "encut": 400,
-                "prec": "Normal",
-                "kspacing": 0.6,
-                "sigma": 0.1,
-                "ediff": "1e-4",
-                "ediffg": "-0.1",
-                "nsw": 200,
-                "ibrion": 2,
-                "isif": 4,
-                "potim": 0.1,
-            },
-            {
-                "suffix": "3",
-                "encut": 500,
-                "prec": "Accurate",
-                "kspacing": 0.4,
-                "sigma": 0.05,
-                "ediff": "1e-5",
-                "ediffg": "-0.05",
-                "nsw": 300,
-                "ibrion": 2,
-                "isif": 3,
-                "potim": 0.05,
-            },
-            {
-                "suffix": "4",
-                "encut": self.encut if self.encut else 520,
-                "prec": "Accurate",
-                "kspacing": self.kspacing,
-                "sigma": 0.05,
-                "ediff": "1e-6",
-                "ediffg": "-0.01",
-                "nsw": 500,
-                "ibrion": 2,
-                "isif": 3,
-                "potim": 0.1,
-            },
-        ]
-
-        for p in params:
+        for p in dft.DEFAULT_RELAX_STAGES:
             incar_file = work_dir / f"INCAR_{p['suffix']}"
             with open(incar_file, "w") as f:
                 f.write("ISTART   = 0\n")
                 f.write("ICHARG   = 2\n")
-                f.write("ISYM     = 0\n")
-                f.write(f"ENCUT    = {p['encut']}\n")
+                f.write(f"ISYM     = {dft.DEFAULT_RELAX_COMMON['isym']}\n")
+                f.write(f"ENCUT    = {p['encut'] if p['encut'] != dft.DEFAULT_ENCUT else (self.encut or dft.DEFAULT_ENCUT)}\n")
                 f.write(f"PREC     = {p['prec']}\n")
-                f.write("SYMPREC  = 1e-5\n")
-                f.write("NCORE    = 4\n")
+                f.write(f"SYMPREC  = {dft.DEFAULT_RELAX_COMMON['symprec']}\n")
+                f.write(f"NCORE    = {dft.DEFAULT_RELAX_COMMON['ncore']}\n")
                 f.write(f"KSPACING = {p['kspacing']}\n")
-                f.write("ISMEAR   = 0\n")
+                f.write(f"ISMEAR   = {dft.DEFAULT_RELAX_COMMON['ismear']}\n")
                 f.write(f"SIGMA    = {p['sigma']}\n")
-                f.write("NELM     = 200\n")
-                f.write("NELMIN   = 6\n")
+                f.write(f"NELM     = {dft.DEFAULT_RELAX_COMMON['nelm']}\n")
+                f.write(f"NELMIN   = {dft.DEFAULT_RELAX_COMMON['nelmin']}\n")
                 f.write(f"EDIFF    = {p['ediff']}\n")
                 f.write(f"EDIFFG   = {p['ediffg']}\n")
                 f.write(f"NSW      = {p['nsw']}\n")

@@ -58,3 +58,4 @@
 - 2025-12-23：新增 skill `skills/public/vaspflow-test-runner`（含 run_vaspflow.sh、collect_logs.py、report-template），用于仓库内 VASP 跑测与日志汇总；已打包 `skills/vaspflow-test-runner.skill`，未实际运行 VASP（需按测试输入/配置手动验证）。
 - 2025-12-24：结构优化改为四阶段 INCAR+串行脚本，`submit=false` 时仅准备输入不提交，prepare 模式下缺失 CHGCAR/POTCAR 不再阻断后续输入准备（需实际运行后补齐）。
 - 2025-12-24：RelaxPipeline 默认断点文件更名为 `relax_checkpoint.json`，兼容读取旧的 `pipeline_checkpoint.json`。
+- 2025-12-24：新增 `pipelines/defaults.py` 统一管理最低优先级默认值（提交/并发、kspacing/encut、MD/phonon、队列脚本头、四阶段 relax 等），CLI 与各 Pipeline 均改为引用该集中默认。

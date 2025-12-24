@@ -18,6 +18,9 @@ except ModuleNotFoundError:  # pragma: no cover - 兼容旧版
 
 logger = logging.getLogger(__name__)
 
+# 兜底默认
+from vasp.pipelines import defaults as dft
+
 
 @dataclass
 class JobConfig:
@@ -71,9 +74,12 @@ def load_job_config(toml_path: Optional[Path] = None) -> JobConfig:
         cfg["default_mpi_procs"] = defaults["mpi_procs"]
     if defaults.get("mpi_cmd"):
         cfg["default_mpi_procs"] = defaults["mpi_cmd"]
+    if "default_mpi_procs" not in cfg:
+        cfg["default_mpi_procs"] = dft.DEFAULT_MPI_PROCS
 
+    # 兜底队列模板：若未提供 [templates] 则使用最低优先级默认
     if not templates:
-        raise ValueError("配置缺少 [templates]，请至少定义一个队列脚本头（如 [templates.slurm]）")
+        templates = {dft.DEFAULT_QUEUE: dft.DEFAULT_QUEUE_HEADERS.get(dft.DEFAULT_QUEUE, "")}
 
     # 仅读取第一个定义的队列模板，其余忽略
     first_queue, first_header = next(iter(templates.items()))
@@ -81,13 +87,15 @@ def load_job_config(toml_path: Optional[Path] = None) -> JobConfig:
     if first_queue not in allowed_queues:
         raise ValueError(f"[templates.{first_queue}] 队列类型不支持，仅允许 {allowed_queues}")
     if not first_header:
-        raise ValueError(f"[templates.{first_queue}] 缺少 header 内容")
+        first_header = dft.DEFAULT_QUEUE_HEADERS.get(first_queue, "")
+    if not first_header:
+        raise ValueError(f"[templates.{first_queue}] 缺少 header 内容，且默认兜底为空")
 
-    cfg["default_queue"] = first_queue
-    cfg["bashtitle"] = first_header if first_queue == "bash" else None
-    cfg["slurmtitle"] = first_header if first_queue == "slurm" else None
-    cfg["pbstitle"] = first_header if first_queue == "pbs" else None
-    cfg["lsftitle"] = first_header if first_queue == "lsf" else None
+    cfg["default_queue"] = first_queue or dft.DEFAULT_QUEUE
+    cfg["bashtitle"] = first_header if first_queue == "bash" else (dft.DEFAULT_QUEUE_HEADERS.get("bash") if first_queue != "bash" else first_header)
+    cfg["slurmtitle"] = first_header if first_queue == "slurm" else (dft.DEFAULT_QUEUE_HEADERS.get("slurm") if first_queue != "slurm" else first_header)
+    cfg["pbstitle"] = first_header if first_queue == "pbs" else (dft.DEFAULT_QUEUE_HEADERS.get("pbs") if first_queue != "pbs" else first_header)
+    cfg["lsftitle"] = first_header if first_queue == "lsf" else (dft.DEFAULT_QUEUE_HEADERS.get("lsf") if first_queue != "lsf" else first_header)
 
     required = ["vasp_std", "vasp_gam"]
     missing = [k for k in required if not cfg.get(k)]
@@ -101,8 +109,8 @@ def load_job_config(toml_path: Optional[Path] = None) -> JobConfig:
         slurmtitle=str(cfg["slurmtitle"]).strip() if cfg.get("slurmtitle") else None,
         pbstitle=str(cfg["pbstitle"]).strip() if cfg.get("pbstitle") else None,
         lsftitle=str(cfg["lsftitle"]).strip() if cfg.get("lsftitle") else None,
-        default_mpi_procs=cfg.get("default_mpi_procs") or 8,
-        default_queue=str(cfg.get("default_queue") or "bash"),
+        default_mpi_procs=cfg.get("default_mpi_procs") or dft.DEFAULT_MPI_PROCS,
+        default_queue=str(cfg.get("default_queue") or dft.DEFAULT_QUEUE),
     )
 
 

@@ -15,6 +15,7 @@ from typing import Optional, List
 
 from vasp.pipelines.base import BasePipeline
 from vasp.pipelines.utils import ensure_poscar, prepare_potcar, check_vasp_completion, find_symmetry
+from vasp.pipelines import defaults as dft
 from vasp.analysis import plotters
 from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
@@ -40,9 +41,9 @@ class PhononPropertiesPipeline(BasePipeline):
         structure_file: Path,
         work_dir: Path,
         supercell: List[int] = None,
-        method: str = "disp",
+        method: str = dft.DEFAULT_PHONON_METHOD,
         kdensity: Optional[float] = None,
-        kspacing: Optional[float] = 0.3,
+        kspacing: Optional[float] = dft.DEFAULT_KSPACING,
         encut: Optional[float] = None,
         queue_system: Optional[str] = None,
         mpi_procs: Optional[str] = None,
@@ -52,7 +53,7 @@ class PhononPropertiesPipeline(BasePipeline):
         potcar_map: Optional[dict[str, str]] = None,
         job_cfg: Optional[JobConfig] = None,
         config_path: Optional[Path] = None,
-        phonon_structure: str = "primitive",
+        phonon_structure: str = dft.DEFAULT_PHONON_STRUCTURE,
         **kwargs
     ):
         """
@@ -88,7 +89,7 @@ class PhononPropertiesPipeline(BasePipeline):
         super().__init__(structure_file, work_dir, pressure=pressure, **kwargs)
 
         self.job_cfg = job_cfg or load_job_config(config_path)
-        self.supercell = supercell or [2, 2, 2]
+        self.supercell = supercell or list(dft.DEFAULT_PHONON_SUPERCELL)
         self.method = method
         self.kdensity = kdensity or 8000
         self.kspacing = kspacing
@@ -427,16 +428,16 @@ class PhononPropertiesPipeline(BasePipeline):
         with open(incar_file, 'w') as f:
             f.write("# Relaxation INCAR for Phonon\n")
             f.write("SYSTEM = Structure Relaxation\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("EDIFF = 1E-8\n")  # 声子计算需要更高精度
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.01\n\n")
+            f.write(f"PREC = {dft.DEFAULT_PHONON_RELAX_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_PHONON_RELAX_INCAR['encut']}\n")
+            f.write(f"EDIFF = {dft.DEFAULT_PHONON_RELAX_INCAR['ediff']}\n")  # 声子计算需要更高精度
+            f.write(f"ISMEAR = {dft.DEFAULT_PHONON_RELAX_INCAR['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_PHONON_RELAX_INCAR['sigma']}\n\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n\n")
-            f.write("IBRION = 2\n")
-            f.write("NSW = 200\n")
-            f.write("ISIF = 3\n")
-            f.write("EDIFFG = -1E-5\n\n")  # 更严格的收敛标准
+            f.write(f"IBRION = {dft.DEFAULT_PHONON_RELAX_INCAR['ibrion']}\n")
+            f.write(f"NSW = {dft.DEFAULT_PHONON_RELAX_INCAR['nsw']}\n")
+            f.write(f"ISIF = {dft.DEFAULT_PHONON_RELAX_INCAR['isif']}\n")
+            f.write(f"EDIFFG = {dft.DEFAULT_PHONON_RELAX_INCAR['ediffg']}\n\n")  # 更严格的收敛标准
             f.write("LWAVE = .FALSE.\n")
             f.write("LCHARG = .FALSE.\n")
 
@@ -445,13 +446,13 @@ class PhononPropertiesPipeline(BasePipeline):
         with open(incar_file, 'w') as f:
             f.write("# Phonon INCAR (Displacement method)\n")
             f.write("SYSTEM = Phonon Calculation\n\n")
-            f.write("PREC = Accurate\n")
-            f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("EDIFF = 1E-8\n")
-            f.write("ISMEAR = 0\n")
-            f.write("SIGMA = 0.01\n")
-            f.write("IBRION = -1\n")  # 单点能量计算
-            f.write("NSW = 0\n")
+            f.write(f"PREC = {dft.DEFAULT_PHONON_INCAR['prec']}\n")
+            f.write(f"ENCUT = {self.encut if self.encut else dft.DEFAULT_PHONON_INCAR['encut']}\n")
+            f.write(f"EDIFF = {dft.DEFAULT_PHONON_INCAR['ediff']}\n")
+            f.write(f"ISMEAR = {dft.DEFAULT_PHONON_INCAR['ismear']}\n")
+            f.write(f"SIGMA = {dft.DEFAULT_PHONON_INCAR['sigma']}\n")
+            f.write(f"IBRION = {dft.DEFAULT_PHONON_INCAR['ibrion']}\n")  # 单点能量计算
+            f.write(f"NSW = {dft.DEFAULT_PHONON_INCAR['nsw']}\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
             f.write("LWAVE = .FALSE.\n")
             f.write("LCHARG = .FALSE.\n")
