@@ -204,6 +204,10 @@ class PhononPropertiesPipeline(BasePipeline):
         job_script = self._write_job_script(self.relax_dir, "relax")
         job_id = self._submit_job(self.relax_dir, job_script)
 
+        if self.prepare_only:
+            logger.info("submit=false，仅准备声子 relax 输入，不提交任务")
+            return True
+
         # 等待完成
         if not self._wait_for_job(job_id, self.relax_dir, self.queue_system):
             return False
@@ -497,6 +501,9 @@ class PhononPropertiesPipeline(BasePipeline):
             raise ValueError(f"不支持的 phonon_structure: {self.phonon_structure}")
 
         if not poscar.exists():
+            if self.prepare_only:
+                logger.info("submit=false，尚未得到 relax 产物，声子结构回退为输入结构")
+                return self.structure_file
             raise FileNotFoundError(f"声子计算的结构文件不存在: {poscar}")
         return poscar
 
@@ -514,4 +521,7 @@ class PhononPropertiesPipeline(BasePipeline):
 
     def _submit_job(self, work_dir: Path, job_script: str) -> str:
         """提交任务"""
+        if self.prepare_only:
+            logger.info("submit=false，未提交任务")
+            return "prepare_only"
         return submit_job(Path(job_script), self.queue_system)

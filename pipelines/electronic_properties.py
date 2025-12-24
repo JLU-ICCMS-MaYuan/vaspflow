@@ -301,11 +301,24 @@ class PropertiesPipeline(BasePipeline):
 
         # 复制文件
         shutil.copy(self.scf_dir / "POSCAR", self.dos_dir / "POSCAR")
-        if not (self.scf_dir / "CHGCAR").exists():
+        if (self.scf_dir / "CHGCAR").exists():
+            shutil.copy(self.scf_dir / "CHGCAR", self.dos_dir / "CHGCAR")
+        elif self.prepare_only:
+            logger.info("submit=false，缺少 CHGCAR，先生成 DOS 输入稍后再补齐电荷密度")
+        else:
             logger.error("缺少 CHGCAR，DOS 无法继续")
             return False
-        shutil.copy(self.scf_dir / "CHGCAR", self.dos_dir / "CHGCAR")
-        shutil.copy(self.scf_dir / "POTCAR", self.dos_dir / "POTCAR")
+
+        if (self.scf_dir / "POTCAR").exists():
+            shutil.copy(self.scf_dir / "POTCAR", self.dos_dir / "POTCAR")
+        elif self.potcar_map:
+            from vasp.pipelines.utils import prepare_potcar
+            if not prepare_potcar(self.dos_dir / "POSCAR", self.potcar_map, self.dos_dir / "POTCAR"):
+                logger.error("POTCAR准备失败")
+                return False
+        elif not self.prepare_only:
+            logger.error("缺少 POTCAR，DOS 无法继续")
+            return False
 
         # 创建INCAR（DOS）
         self._write_dos_incar(self.dos_dir / "INCAR")
@@ -332,11 +345,24 @@ class PropertiesPipeline(BasePipeline):
 
         # 复制文件
         shutil.copy(self.scf_dir / "POSCAR", self.band_dir / "POSCAR")
-        if not (self.scf_dir / "CHGCAR").exists():
+        if (self.scf_dir / "CHGCAR").exists():
+            shutil.copy(self.scf_dir / "CHGCAR", self.band_dir / "CHGCAR")
+        elif self.prepare_only:
+            logger.info("submit=false，缺少 CHGCAR，先生成能带输入稍后再补齐电荷密度")
+        else:
             logger.error("缺少 CHGCAR，Band 无法继续")
             return False
-        shutil.copy(self.scf_dir / "CHGCAR", self.band_dir / "CHGCAR")
-        shutil.copy(self.scf_dir / "POTCAR", self.band_dir / "POTCAR")
+
+        if (self.scf_dir / "POTCAR").exists():
+            shutil.copy(self.scf_dir / "POTCAR", self.band_dir / "POTCAR")
+        elif self.potcar_map:
+            from vasp.pipelines.utils import prepare_potcar
+            if not prepare_potcar(self.band_dir / "POSCAR", self.potcar_map, self.band_dir / "POTCAR"):
+                logger.error("POTCAR准备失败")
+                return False
+        elif not self.prepare_only:
+            logger.error("缺少 POTCAR，Band 无法继续")
+            return False
 
         # 创建INCAR（能带）
         self._write_band_incar(self.band_dir / "INCAR")
@@ -363,8 +389,24 @@ class PropertiesPipeline(BasePipeline):
 
         # 复制文件
         shutil.copy(self.scf_dir / "POSCAR", self.elf_dir / "POSCAR")
-        shutil.copy(self.scf_dir / "CHGCAR", self.elf_dir / "CHGCAR")
-        shutil.copy(self.scf_dir / "POTCAR", self.elf_dir / "POTCAR")
+        if (self.scf_dir / "CHGCAR").exists():
+            shutil.copy(self.scf_dir / "CHGCAR", self.elf_dir / "CHGCAR")
+        elif self.prepare_only:
+            logger.info("submit=false，缺少 CHGCAR，先生成 ELF 输入稍后再补齐电荷密度")
+        else:
+            logger.error("缺少 CHGCAR，ELF 无法继续")
+            return False
+
+        if (self.scf_dir / "POTCAR").exists():
+            shutil.copy(self.scf_dir / "POTCAR", self.elf_dir / "POTCAR")
+        elif self.potcar_map:
+            from vasp.pipelines.utils import prepare_potcar
+            if not prepare_potcar(self.elf_dir / "POSCAR", self.potcar_map, self.elf_dir / "POTCAR"):
+                logger.error("POTCAR准备失败")
+                return False
+        elif not self.prepare_only:
+            logger.error("缺少 POTCAR，ELF 无法继续")
+            return False
 
         # 创建INCAR（ELF）
         self._write_elf_incar(self.elf_dir / "INCAR")
@@ -391,7 +433,16 @@ class PropertiesPipeline(BasePipeline):
 
         # 复制文件
         shutil.copy(self.scf_dir / "POSCAR", self.cohp_dir / "POSCAR")
-        shutil.copy(self.scf_dir / "POTCAR", self.cohp_dir / "POTCAR")
+        if (self.scf_dir / "POTCAR").exists():
+            shutil.copy(self.scf_dir / "POTCAR", self.cohp_dir / "POTCAR")
+        elif self.potcar_map:
+            from vasp.pipelines.utils import prepare_potcar
+            if not prepare_potcar(self.cohp_dir / "POSCAR", self.potcar_map, self.cohp_dir / "POTCAR"):
+                logger.error("POTCAR准备失败")
+                return False
+        elif not self.prepare_only:
+            logger.error("缺少 POTCAR，COHP 无法继续")
+            return False
 
         # 创建INCAR（COHP）
         self._write_cohp_incar(self.cohp_dir / "INCAR")
@@ -416,13 +467,17 @@ class PropertiesPipeline(BasePipeline):
         self.bader_dir.mkdir(parents=True, exist_ok=True)
 
         chgcar = self.scf_dir / "CHGCAR"
-        if not chgcar.exists():
+        if chgcar.exists():
+            shutil.copy(self.scf_dir / "CHGCAR", self.bader_dir / "CHGCAR")
+            if (self.scf_dir / "AECCAR0").exists():
+                shutil.copy(self.scf_dir / "AECCAR0", self.bader_dir / "AECCAR0")
+            if (self.scf_dir / "AECCAR2").exists():
+                shutil.copy(self.scf_dir / "AECCAR2", self.bader_dir / "AECCAR2")
+        elif self.prepare_only:
+            logger.info("submit=false，缺少 CHGCAR，先生成 Bader 输入稍后再补齐电荷密度")
+        else:
             logger.error("缺少 CHGCAR，无法进行 Bader 分析")
             return False
-
-        shutil.copy(self.scf_dir / "CHGCAR", self.bader_dir / "CHGCAR")
-        shutil.copy(self.scf_dir / "AECCAR0", self.bader_dir / "AECCAR0") if (self.scf_dir / "AECCAR0").exists() else None
-        shutil.copy(self.scf_dir / "AECCAR2", self.bader_dir / "AECCAR2") if (self.scf_dir / "AECCAR2").exists() else None
 
         # 写入脚本：调用 bader
         script_path = self._write_bader_script(self.bader_dir)
@@ -441,8 +496,21 @@ class PropertiesPipeline(BasePipeline):
         self.fermi_dir.mkdir(parents=True, exist_ok=True)
 
         shutil.copy(self.scf_dir / "POSCAR", self.fermi_dir / "POSCAR")
-        shutil.copy(self.scf_dir / "CHGCAR", self.fermi_dir / "CHGCAR") if (self.scf_dir / "CHGCAR").exists() else None
-        shutil.copy(self.scf_dir / "POTCAR", self.fermi_dir / "POTCAR")
+        if (self.scf_dir / "CHGCAR").exists():
+            shutil.copy(self.scf_dir / "CHGCAR", self.fermi_dir / "CHGCAR")
+        elif self.prepare_only:
+            logger.info("submit=false，缺少 CHGCAR，先生成费米面输入稍后再补齐电荷密度")
+
+        if (self.scf_dir / "POTCAR").exists():
+            shutil.copy(self.scf_dir / "POTCAR", self.fermi_dir / "POTCAR")
+        elif self.potcar_map:
+            from vasp.pipelines.utils import prepare_potcar
+            if not prepare_potcar(self.fermi_dir / "POSCAR", self.potcar_map, self.fermi_dir / "POTCAR"):
+                logger.error("POTCAR准备失败")
+                return False
+        elif not self.prepare_only:
+            logger.error("缺少 POTCAR，费米面计算无法继续")
+            return False
 
         self._write_fermi_incar(self.fermi_dir / "INCAR")
         self._write_band_kpoints(self.fermi_dir / "KPOINTS")
@@ -532,7 +600,7 @@ class PropertiesPipeline(BasePipeline):
             f.write("SYSTEM = Self-Consistent Calculation\n\n")
             f.write("PREC = Accurate\n")
             f.write("ENCUT = {}\n".format(self.encut if self.encut else 520))
-            f.write("EDIFF = 1E-6\n")
+            f.write("EDIFF = 1E-8\n")
             f.write("ISMEAR = 0\n")
             f.write("SIGMA = 0.05\n")
             f.write(f"PSTRESS = {self.pressure_kbar}\n")
@@ -664,6 +732,9 @@ class PropertiesPipeline(BasePipeline):
 
     def _submit_job(self, work_dir: Path, job_script: str) -> str:
         """提交任务"""
+        if self.prepare_only:
+            logger.info("submit=false，未提交任务")
+            return "prepare_only"
         return submit_job(Path(job_script), self.queue_system)
 
 

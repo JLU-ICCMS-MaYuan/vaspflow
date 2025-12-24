@@ -82,7 +82,9 @@ class BasePipeline(ABC):
         if not self.structure_file.exists():
             raise FileNotFoundError(f"结构文件不存在: {self.structure_file}")
 
-        self.checkpoint_file = checkpoint_file or self.work_dir / "pipeline_checkpoint.json"
+        default_checkpoint = self.work_dir / f"{self.__class__.__name__.replace('Pipeline', '').lower()}_checkpoint.json"
+        self.checkpoint_file = checkpoint_file or default_checkpoint
+        self._legacy_checkpoint_file = self.work_dir / "pipeline_checkpoint.json"
         self.report_file = report_file or self.work_dir / "pipeline_report.txt"
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -268,6 +270,10 @@ class BasePipeline(ABC):
         bool
             任务成功完成返回True
         """
+        if self.prepare_only or job_id == "prepare_only":
+            logger.info("submit=false，仅准备输入，跳过任务等待")
+            return True
+
         logger.info(f"等待任务完成: {job_id}")
 
         start_time = time.time()
@@ -394,18 +400,24 @@ class BasePipeline(ABC):
 
     def _load_checkpoint(self):
         """加载断点状态"""
-        if not self.checkpoint_file.exists():
-            logger.info("未找到断点文件，从头开始")
-            return
+        target = self.checkpoint_file
+        if not target.exists() and getattr(self, "_legacy_checkpoint_file", None):
+            legacy = self._legacy_checkpoint_file
+            if legacy.exists():
+                target = legacy
 
         try:
-            with open(self.checkpoint_file, 'r') as f:
+            if not target.exists():
+                logger.info("未找到断点文件，从头开始")
+                return
+
+            with open(target, 'r') as f:
                 checkpoint = json.load(f)
 
             self.steps_status = {k: StepStatus(v) for k, v in checkpoint.get("steps_status", {}).items()}
             self.steps_data = checkpoint.get("steps_data", {})
 
-            logger.info(f"已加载断点: {self.checkpoint_file}")
+            logger.info(f"已加载断点: {target}")
             logger.info(f"已完成步骤: {[k for k, v in self.steps_status.items() if v == StepStatus.COMPLETED]}")
 
         except Exception as e:

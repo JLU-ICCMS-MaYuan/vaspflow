@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from vasp.pipelines.base import BasePipeline
-from vasp.pipelines.utils import prepare_potcar, ensure_poscar
+from vasp.pipelines.utils import prepare_potcar, ensure_poscar, check_vasp_completion
 from vasp.utils.job import load_job_config, write_job_script, submit_job, JobConfig
 
 logger = logging.getLogger(__name__)
@@ -110,6 +110,10 @@ class MdPipeline(BasePipeline):
         job_script = self._write_job_script(self.relax_dir, "relax")
         job_id = self._submit_job(self.relax_dir, job_script)
 
+        if self.prepare_only:
+            logger.info("submit=false，仅准备 MD 前的 relax 输入，不检查收敛")
+            return True
+
         if not self._wait_for_job(job_id, self.relax_dir, self.queue_system):
             return False
 
@@ -142,6 +146,12 @@ class MdPipeline(BasePipeline):
         if self.include_relax:
             if self.relax_dir and check_vasp_completion(self.relax_dir) and (self.relax_dir / "POTCAR").exists():
                 shutil.copy(self.relax_dir / "POTCAR", self.md_dir / "POTCAR")
+            elif self.prepare_only:
+                if self.relax_dir and (self.relax_dir / "POTCAR").exists():
+                    shutil.copy(self.relax_dir / "POTCAR", self.md_dir / "POTCAR")
+                elif self.potcar_map:
+                    prepare_potcar(self.md_dir / "POSCAR", self.potcar_map, self.md_dir / "POTCAR")
+                logger.info("submit=false，未检测到收敛 relax，先准备 MD 输入")
             else:
                 logger.error("未检测到已收敛的 relax，MD 不允许启动")
                 return False
@@ -151,6 +161,10 @@ class MdPipeline(BasePipeline):
 
         job_script = self._write_job_script(self.md_dir, "md")
         job_id = self._submit_job(self.md_dir, job_script)
+
+        if self.prepare_only:
+            logger.info("submit=false，仅准备 MD 输入，不提交任务")
+            return True
 
         if not self._wait_for_job(job_id, self.md_dir, self.queue_system):
             return False
@@ -222,4 +236,7 @@ class MdPipeline(BasePipeline):
         return str(script_path)
 
     def _submit_job(self, work_dir: Path, job_script: str) -> str:
+        if self.prepare_only:
+            logger.info("submit=false，未提交任务")
+            return "prepare_only"
         return submit_job(Path(job_script), self.queue_system)

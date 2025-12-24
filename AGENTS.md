@@ -56,3 +56,5 @@
 - 2025-12-16：配置与赝势来源统一为 TOML（仅读取 `job_templates.local.toml` 或 `--config` 指定文件），移除环境变量/用户级兼容；POTCAR 仅按 `[potcar]` 映射拼接；CLI 仍只保留 `-i`/`-p`/`--config`，README 更新为新用法。
 - 2025-12-16：队列模板仅采纳首个 `[templates.<queue>]`，缺失模板即报错；声子计算新增结构选择开关 `[phonon].structure`（默认原胞）。 
 - 2025-12-23：新增 skill `skills/public/vaspflow-test-runner`（含 run_vaspflow.sh、collect_logs.py、report-template），用于仓库内 VASP 跑测与日志汇总；已打包 `skills/vaspflow-test-runner.skill`，未实际运行 VASP（需按测试输入/配置手动验证）。
+- 2025-12-24：结构优化改为四阶段 INCAR+串行脚本，`submit=false` 时仅准备输入不提交，prepare 模式下缺失 CHGCAR/POTCAR 不再阻断后续输入准备（需实际运行后补齐）。
+- 2025-12-24：RelaxPipeline 默认断点文件更名为 `relax_checkpoint.json`，兼容读取旧的 `pipeline_checkpoint.json`。
