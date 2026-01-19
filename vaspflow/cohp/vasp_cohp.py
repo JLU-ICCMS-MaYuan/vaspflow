@@ -16,7 +16,7 @@ except ImportError:
 
 class VaspCohpSetup:
     def __init__(self, config_file="input.toml", struct_file=None):
-        self.work_dir = "cohp"
+        self.work_dir = "vasp_cohp"
         # 1. 加载配置文件
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"找不到配置文件: {config_file}")

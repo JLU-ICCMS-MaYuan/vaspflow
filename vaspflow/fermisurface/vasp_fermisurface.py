@@ -16,7 +16,7 @@ except ImportError:
 
 class VaspFermiSetup:
     def __init__(self, config_file="input.toml", struct_file=None):
-        self.work_dir = "fermisurface"
+        self.work_dir = "vasp_fermisurface"
         # 1. 加载配置文件
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"找不到配置文件: {config_file}")

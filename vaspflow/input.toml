@@ -2,8 +2,8 @@
 potcar_dir = "~/pot/PBE"
 # eledos的kmesh是scf的kmesh的2倍的密度
 kmesh = 0.025
-chgcar_path = "scf/CHGCAR"
-wavecar_path = "scf/WAVECAR"
+chgcar_path = "vasp_scf/CHGCAR"
+wavecar_path = "vasp_scf/WAVECAR"
 
 [vasp]
 executable_path = "mpirun -np 48 vasp_std"
