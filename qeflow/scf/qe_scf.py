@@ -193,7 +193,7 @@ class QESetup:
         pw_path = qe_config.get("executable_path", "mpirun -np 4 pw.x")
         slurm_header = self.config.get("slurm", {}).get("header", "#!/bin/bash")
 
-        run_script_path = os.path.join(self.work_dir, "run_qe.sh")
+        run_script_path = os.path.join(self.work_dir, "qe_scf.sh")
         with open(run_script_path, "w") as f:
             f.write(slurm_header.strip() + "\n\n")
             f.write(f"echo 'Job started at' `date` \n")
@@ -222,8 +222,7 @@ class QESetup:
             
             print(f"\n所有 QE 输入文件已在 {self.work_dir} 目录中准备就绪！")
 
-            if run_calc:
-                # 执行逻辑
+            if run_calc: # 执行逻辑
                 pass
                 
         except Exception as e:
