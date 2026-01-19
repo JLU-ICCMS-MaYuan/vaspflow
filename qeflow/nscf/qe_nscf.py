@@ -3,6 +3,7 @@ import os
 import shutil
 import argparse
 import subprocess
+import sys
 import numpy as np
 
 try:
@@ -30,6 +31,9 @@ class QENSCFSetup:
             self.config = toml.load(config_file)
         
         self.struct_file = struct_file
+        nscf_config = self.config.get("nscf", {})
+        self.k_automatic = nscf_config.get("k_automatic", True)
+        self.wan = nscf_config.get("wan", False)
         
         # 2. 默认 QE 参数模板 (Namelists)
         # 注意：NSCF 默认使用 tetrahedra 且通常需要 high verbosity
@@ -113,6 +117,46 @@ class QENSCFSetup:
         kpts = [int(max(1, np.ceil(l / (spacing * 2 * np.pi)))) for l in b_lengths]
         return kpts
 
+    def get_kmesh_justlike_kmesh_pl(self, kpoints):
+        """
+        读取self.kpoints_dense参数, 将其传给n1, n2, n3, 再将n1, n2, n3转化为相应的倒空间的均匀网格点坐标
+        """
+        # 获取输入的 n1, n2, n3
+        n1, n2, n3 = kpoints
+
+        # 参数检查：确保 n1, n2, n3 都大于 0
+        if n1 <= 0:
+            print("n1 must be > 0")
+            sys.exit()
+        if n2 <= 0:
+            print("n2 must be > 0")
+            sys.exit()
+        if n3 <= 0:
+            print("n3 must be > 0")
+            sys.exit()
+
+        # 计算总的 k 点数量
+        totpts = n1 * n2 * n3
+
+        kpoints_coords = []
+        if not self.wan: # 前三列写k点倒空间分数坐标，第四列写其权重
+            print("K_POINTS crystal")
+            print(totpts)
+            for x in range(n1):
+                for y in range(n2):
+                    for z in range(n3):
+                        # 格式化输出 k 点信息
+                        # print(f"{x/n1:12.8f}{y/n2:12.8f}{z/n3:12.8f}{1/totpts:14.6e}")
+                        kpoints_coords.append(f"{x/n1:12.8f}{y/n2:12.8f}{z/n3:12.8f}{1/totpts:14.6e}")
+        else:  # 只写前三列写k点倒空间分数坐标
+            for x in range(n1):
+                for y in range(n2):
+                    for z in range(n3):
+                        # 格式化输出 k 点信息（没有权重）
+                        # print(f"{x/n1:12.8f}{y/n2:12.8f}{z/n3:12.8f}")
+                        kpoints_coords.append(f"{x/n1:12.8f}{y/n2:12.8f}{z/n3:12.8f}")
+        return kpoints_coords, totpts
+
     def generate_qe_input(self, struct_info):
         """生成 QE pw.x 输入文件"""
         print(f"正在生成 nscf.in...")
@@ -180,12 +224,20 @@ class QENSCFSetup:
             f.write("\n")
             
             # K_POINTS
-            # 优先从 [nscf] 节读取 kmesh
             nscf_config = self.config.get("nscf", {})
-            kmesh_val = nscf_config.get("kmesh", 0.02)
-            kpts = self.get_kpoints(struct_info["lattice"], kmesh_val)
-            f.write("K_POINTS automatic\n")
-            f.write(f"  {kpts[0]} {kpts[1]} {kpts[2]} 0 0 0\n")
+            kpoints_dense = nscf_config.get("kpoints_dense")
+            if kpoints_dense is None:
+                kmesh_val = nscf_config.get("kmesh", 0.02)
+                kpoints_dense = self.get_kpoints(struct_info["lattice"], kmesh_val)
+            if self.k_automatic:
+                f.write("K_POINTS automatic\n")
+                f.write(f"  {kpoints_dense[0]} {kpoints_dense[1]} {kpoints_dense[2]} 0 0 0\n")
+            else:
+                kpoints_coords, totpts = self.get_kmesh_justlike_kmesh_pl(kpoints_dense)
+                f.write("K_POINTS crystal\n")
+                f.write(f"{totpts}\n")
+                for kinfo in kpoints_coords:
+                    f.write(f" {kinfo}\n")
 
     def create_run_script(self):
         """创建运行脚本"""

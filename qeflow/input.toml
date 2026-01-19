@@ -47,7 +47,20 @@ Al = { mass = 26.982, pseudo = "Al.pbe-n-kjpaw_psl.1.0.0.UPF" }
 Fe = { mass = 55.845, pseudo = "Fe.pbe-n-kjpaw_psl.1.0.0.UPF" }
 
 [nscf]
+k_automatic = true
+kpoints_dense = [6, 6, 6]
+wan = false
 kmesh = 0.02
+# k_automatic = true → 写 K_POINTS automatic
+# k_automatic = false → 写 K_POINTS crystal + 坐标列表（用
+# get_kmesh_justlike_kmesh_pl）
+# kpoints_dense 必填（除非你只用 kmesh 走自动换算）
+# 先看 [nscf].kpoints_dense
+#   - 如果有，就直接用它，不管 kmesh 是多少。
+# 如果没有 kpoints_dense，才用 kmesh 计算出等价网格。
+# k_automatic 只决定输出格式：
+#   - true → K_POINTS automatic
+#   - false → K_POINTS crystal + 坐标列表
 
 # NSCF 特有参数覆盖 (可选)
 [nscf_params.SYSTEM]

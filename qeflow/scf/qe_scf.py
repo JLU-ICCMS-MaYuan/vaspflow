@@ -193,7 +193,7 @@ class QESetup:
         pw_path = qe_config.get("executable_path", "mpirun -np 4 pw.x")
         slurm_header = self.config.get("slurm", {}).get("header", "#!/bin/bash")
 
-        run_script_path = os.path.join(self.work_dir, "qe_scf.sh")
+        run_script_path = os.path.join(self.work_dir, "run_qe.sh")
         with open(run_script_path, "w") as f:
             f.write(slurm_header.strip() + "\n\n")
             f.write(f"echo 'Job started at' `date` \n")
