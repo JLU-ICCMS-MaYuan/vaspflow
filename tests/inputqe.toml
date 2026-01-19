@@ -1,0 +1,47 @@
+# Quantum ESPRESSO 运行配置
+# kmesh 为 K 点密度 (spacing)，单位为 2pi/Angstrom
+kmesh = 0.04
+
+[qe]
+executable_path = "mpirun -np 48 pw.x"
+
+# Slurm 提交脚本配置
+[slurm]
+header = """
+#!/bin/sh
+#SBATCH  --job-name=qe_job
+#SBATCH  --output=log.out
+#SBATCH  --error=log.err
+#SBATCH  --partition=liuhanyu
+#SBATCH  --nodes=1
+#SBATCH  --ntasks=48
+#SBATCH  --ntasks-per-node=48
+#SBATCH  --cpus-per-task=1
+
+source /work/home/mayuan/intel/oneapi/setvars.sh --force
+ulimit -s unlimited
+"""
+
+# QE pw.x 参数自定义 (Namelists)
+[qe_params.CONTROL]
+prefix = "'qe'"
+outdir = "'./out'"
+pseudo_dir = "'~/pseudo/qe'"
+
+[qe_params.SYSTEM]
+ecutwfc = 60.0
+ecutrho = 480.0
+occupations = "'smearing'"
+smearing = "'methfessel-paxton'"
+degauss = 0.02
+
+[qe_params.ELECTRONS]
+conv_thr = 1.0e-8
+mixing_beta = 0.7
+
+# 元素与赝势文件的映射关系
+[pseudo_map]
+Si = { mass = 28.085, pseudo = "Si.pbe-n-rrkjus_psl.1.0.0.UPF" }
+O  = { mass = 15.999, pseudo = "O.pbe-n-kkjus_psl.0.1.UPF" }
+Al = { mass = 26.982, pseudo = "Al.pbe-n-kjpaw_psl.1.0.0.UPF" }
+Fe = { mass = 55.845, pseudo = "Fe.pbe-n-kjpaw_psl.1.0.0.UPF" }
