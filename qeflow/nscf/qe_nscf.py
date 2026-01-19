@@ -222,19 +222,57 @@ class QENSCFSetup:
             else:
                 raise FileNotFoundError("找不到结构文件，且无法从 qe_scf 自动获取。")
 
-            # 2. 拷贝 SCF 生成的数据 (outdir)
-            # 获取配置中的 outdir，默认为 ./out
-            outdir_name = self.qe_params["CONTROL"]["outdir"].strip("'" ).strip('"')
-            src_out = os.path.join(self.scf_dir, outdir_name)
-            dst_out = os.path.join(self.work_dir, outdir_name)
+                        # 2. 拷贝 SCF 生成的数据 (outdir 及其内部的 prefix.save)
+
+                        # 自动获取 prefix 和 outdir，确保 NSCF 与 SCF 一致
+
+                        outdir_val = self.qe_params["CONTROL"]["outdir"].strip("'").strip('"')
+
+                        prefix_val = self.qe_params["CONTROL"]["prefix"].strip("'").strip('"')
+
+                        
+
+                        save_dir_name = f"{prefix_val}.save"
+
+                        src_out_base = os.path.join(self.scf_dir, outdir_val)
+
+                        src_save_path = os.path.join(src_out_base, save_dir_name)
+
+                        
+
+                        dst_out_base = os.path.join(self.work_dir, outdir_val)
+
+                        dst_save_path = os.path.join(dst_out_base, save_dir_name)
+
+                        
+
+                        if os.path.exists(src_save_path):
+
+                            # 创建目标 outdir 层级
+
+                            os.makedirs(dst_out_base, exist_ok=True)
+
+                            if os.path.exists(dst_save_path):
+
+                                shutil.rmtree(dst_save_path)
+
+                            
+
+                            # 拷贝整个 .save 目录以包含 xml, dat, paw 等所有必要文件
+
+                            shutil.copytree(src_save_path, dst_save_path)
+
+                            print(f"已成功从 {src_save_path} 拷贝数据至 {dst_save_path}")
+
+                            print(f"  - 包含: data-file-schema.xml, charge-density.dat, paw.txt 等")
+
+                        else:
+
+                            print(f"警告: 找不到 SCF 的数据目录 {src_save_path}")
+
+                            print(f"      请确保 {self.scf_dir} 中已完成计算且 prefix='{prefix_val}', outdir='{outdir_val}'")
+
             
-            if os.path.exists(src_out):
-                if os.path.exists(dst_out):
-                    shutil.rmtree(dst_out)
-                shutil.copytree(src_out, dst_out)
-                print(f"已从 {src_out} 拷贝电荷密度等数据到 {dst_out}")
-            else:
-                print(f"警告: 找不到 SCF 输出目录 {src_out}，NSCF 计算可能因缺少起始电荷密度而失败。" )
 
             struct_info = self.parse_poscar(target_poscar)
             self.generate_qe_input(struct_info)
