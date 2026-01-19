@@ -26,7 +26,7 @@ vasp_eledos = "vaspflow.eledos.vasp_eledos:main"
 vasp_fermi = "vaspflow.fermisurface.vasp_fermisurface:main"
 vasp_cohp = "vaspflow.cohp.vasp_cohp:main"
 vasp_lobster = "vaspflow.cohp.vasp_process_cohp:main"
-qe_scf = "quantumespressoflow.qe_scf:main"
+qe_scf = "qeflow.scf.qe_scf:main"
 
 [tool.setuptools]
 packages = {find = {where = ["."], include = ["*flow*"]}}

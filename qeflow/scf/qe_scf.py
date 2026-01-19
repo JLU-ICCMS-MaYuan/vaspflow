@@ -17,7 +17,7 @@ except ImportError:
 
 class QESetup:
     def __init__(self, config_file="input.toml", struct_file=None):
-        self.work_dir = "qe_scf"
+        self.work_dir = "scf"
         # 1. 加载配置文件
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"找不到配置文件: {config_file}")
