@@ -95,13 +95,18 @@ class QESetup:
         total_atoms = sum(counts)
         for i in range(total_atoms):
             positions.append(lines[start_line + i].split()[:3])
+        
+        pos_array = np.array(positions, dtype=float)
+        # 如果是笛卡尔坐标，也需要乘以缩放因子
+        if not coord_line.lower().startswith('d'):
+            pos_array *= scale
             
         return {
             "lattice": np.array(lattice),
             "elements": elements,
             "counts": counts,
             "coord_type": coord_line,
-            "positions": np.array(positions, dtype=float)
+            "positions": pos_array
         }
 
     def get_kpoints(self, lattice, kmesh):
@@ -158,9 +163,9 @@ class QESetup:
             # ATOMIC_POSITIONS
             coord_type = struct_info["coord_type"]
             if coord_type.lower().startswith('d'):
-                f.write("ATOMIC_POSITIONS crystal\n")
+                f.write("ATOMIC_POSITIONS {crystal}\n")
             else:
-                f.write("ATOMIC_POSITIONS angstrom\n")
+                f.write("ATOMIC_POSITIONS {angstrom}\n")
                 
             atom_idx = 0
             for el_idx, el in enumerate(struct_info["elements"]):
@@ -177,7 +182,7 @@ class QESetup:
             f.write(f"  {kpts[0]} {kpts[1]} {kpts[2]} 0 0 0\n\n")
             
             # CELL_PARAMETERS
-            f.write("CELL_PARAMETERS angstrom\n")
+            f.write("CELL_PARAMETERS {angstrom}\n")
             for vec in struct_info["lattice"]:
                 f.write(f"  {vec[0]:12.8f} {vec[1]:12.8f} {vec[2]:12.8f}\n")
 
