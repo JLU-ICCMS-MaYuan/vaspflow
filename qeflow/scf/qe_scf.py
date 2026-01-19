@@ -179,7 +179,7 @@ class QESetup:
             # CELL_PARAMETERS
             f.write("CELL_PARAMETERS angstrom\n")
             for vec in struct_info["lattice"]:
-                f.write(f"  {vec[0]:12.88f} {vec[1]:12.88f} {vec[2]:12.88f}\n")
+                f.write(f"  {vec[0]:12.8f} {vec[1]:12.8f} {vec[2]:12.8f}\n")
 
     def create_run_script(self):
         """创建运行脚本"""
