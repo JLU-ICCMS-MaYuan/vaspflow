@@ -76,6 +76,11 @@
 - **方案**：在 `wannier90flow/wannier_init.py` 中直接写入 `wannier90.x` 与 `pw2wannier90.x` 命令行，并保留日志重定向。
 - **状态**：已完成。
 
+### [2026-01-20] Wannier90 本地运行打印命令
+- **需求**：本地 `--run` 时打印每一步实际执行的命令，便于排查。
+- **方案**：在 `wannier90flow/wannier_init.py` 中为三步命令构造并打印，再执行。
+- **状态**：已完成。
+
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
 - **需求**：
     1. 在 `qeflow` 目录下增加 `qe_scf.py`。

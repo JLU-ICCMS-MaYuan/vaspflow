@@ -259,9 +259,15 @@ def run_wannier90_pipeline(work_dir: str, prefix: str, cfg: Dict[str, Any]) -> N
     ensure_pw2wan_input(pw2_input_path, prefix, cfg)
 
     print("开始执行 Wannier90 流程（-pp -> pw2wannier90 -> wannier90）...")
-    subprocess.run(f'{exec_path} -pp "{prefix}"', shell=True, check=True, cwd=work_dir)
-    subprocess.run(f'{pw2_exec_path} < "{pw2_input_name}" > PW2WAN.log 2>&1', shell=True, check=True, cwd=work_dir)
-    subprocess.run(f'{exec_path} "{prefix}.win" > WANNIER90.log 2>&1', shell=True, check=True, cwd=work_dir)
+    cmd_pp = f'{exec_path} -pp "{prefix}"'
+    print(f"执行命令: {cmd_pp}")
+    subprocess.run(cmd_pp, shell=True, check=True, cwd=work_dir)
+    cmd_pw2 = f'{pw2_exec_path} < "{pw2_input_name}" > PW2WAN.log 2>&1'
+    print(f"执行命令: {cmd_pw2}")
+    subprocess.run(cmd_pw2, shell=True, check=True, cwd=work_dir)
+    cmd_w90 = f'{exec_path} "{prefix}.win" > WANNIER90.log 2>&1'
+    print(f"执行命令: {cmd_w90}")
+    subprocess.run(cmd_w90, shell=True, check=True, cwd=work_dir)
 
 
 def write_win(
