@@ -10,8 +10,7 @@
 示例：
 python wannier90flow/prepare_wannier90.py \
   --poscar POSCAR \
-  --config wannier90.toml \
-  --output Ce1Sc2H24.win
+  --config wannier90.toml
 """
 
 import argparse
@@ -254,7 +253,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="准备 Wannier90 .win 输入文件")
     parser.add_argument("-p", "--poscar", default="POSCAR", help="结构文件 (VASP POSCAR)")
     parser.add_argument("-c", "--config", required=True, help="配置文件 (TOML/JSON)")
-    parser.add_argument("-o", "--output", default=None, help="输出 .win 文件路径")
     args = parser.parse_args()
 
     struct = parse_poscar(args.poscar)
@@ -277,10 +275,8 @@ def main() -> None:
     else:
         print(f"未找到 {kpath_file}，将不写入 kpoint_path（可先用 vaspkit 303 生成）。")
 
-    output = args.output
-    if output is None:
-        basename = cfg.get("system_name") or "wannier90"
-        output = f"{basename}.win"
+    basename = cfg.get("system_name") or struct["comment"] or "wannier90"
+    output = f"{basename}.win"
 
     write_win(output, struct, cfg, kpoints, band_segments)
     print(f"已生成 {output}，包含 {len(kpoints)} 个 k 点。")
