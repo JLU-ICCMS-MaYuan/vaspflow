@@ -37,6 +37,14 @@
 - **方案**：在 `[project.scripts]` 新增 `wannier_window` 指向 `wannier90flow.wannier_window:main`，保留现有 `wannier_init`。
 - **状态**：已完成。
 
+### [2026-01-20] Wannier90 可执行路径与 --run 支持
+- **需求**：在测试配置中补充 Wannier90 与 pw2wannier90 的可执行文件路径，并支持 `--run` 执行流程。
+- **方案**：
+    1. 在 `tests/inputwannier.toml` 增加 `[wannier90]` 与 `[pw2wannier90]` 的 `executable_path`。
+    2. 在 `wannier90flow/wannier_init.py` 增加 `--run`，顺序执行 `wannier90 -pp`、`pw2wannier90`、`wannier90`。
+    3. 运行脚本中加入 `pw2wannier90` 输入文件检查。
+- **状态**：已完成。
+
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
 - **需求**：
     1. 在 `qeflow` 目录下增加 `qe_scf.py`。

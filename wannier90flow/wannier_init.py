@@ -16,7 +16,7 @@ python wannier90flow/wannier_init.py \
 import argparse
 import json
 import os
-import sys
+import subprocess
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -150,6 +150,9 @@ def create_run_script(work_dir: str, prefix: str, cfg: Dict[str, Any]) -> None:
     """生成提交脚本，包含 -pp 预处理与主计算占位。"""
     w90_cfg = cfg.get("wannier90", {})
     exec_path = w90_cfg.get("executable_path", "wannier90.x")
+    pw2_cfg = cfg.get("pw2wannier90", {})
+    pw2_exec_path = pw2_cfg.get("executable_path", "pw2wannier90.x")
+    pw2_input = pw2_cfg.get("input_file", f"{prefix}.pw2wan.in")
     slurm_header = cfg.get("slurm", {}).get("header", "#!/bin/bash")
 
     script_path = os.path.join(work_dir, "run_wannier90.sh")
@@ -159,13 +162,39 @@ def create_run_script(work_dir: str, prefix: str, cfg: Dict[str, Any]) -> None:
         f.write('cd "$(dirname "$0")"\n\n')
         f.write(f'PREFIX="{prefix}"\n')
         f.write(f'W90="{exec_path}"\n\n')
+        f.write(f'PW2="{pw2_exec_path}"\n')
+        f.write(f'PW2_INPUT="{pw2_input}"\n\n')
         f.write('echo "Prep NNKP at $(date)"\n')
         f.write('$W90 -pp "$PREFIX"\n')
         f.write('\n')
+        f.write('echo "Run pw2wannier90 at $(date)"\n')
+        f.write('if [ ! -f "$PW2_INPUT" ]; then\n')
+        f.write('  echo "缺少 pw2wannier90 输入文件: $PW2_INPUT"\n')
+        f.write('  exit 1\n')
+        f.write('fi\n')
+        f.write('$PW2 < "$PW2_INPUT"\n')
+        f.write('\n')
         f.write('echo "Run Wannier90 (requires *.amn/*.mmn ready)"\n')
-        f.write('# $W90 "$PREFIX"\n')
+        f.write('$W90 "$PREFIX"\n')
     os.chmod(script_path, 0o755)
     print(f"已生成提交脚本: {script_path}")
+
+
+def run_wannier90_pipeline(work_dir: str, prefix: str, cfg: Dict[str, Any]) -> None:
+    w90_cfg = cfg.get("wannier90", {})
+    exec_path = w90_cfg.get("executable_path", "wannier90.x")
+    pw2_cfg = cfg.get("pw2wannier90", {})
+    pw2_exec_path = pw2_cfg.get("executable_path", "pw2wannier90.x")
+    pw2_input = pw2_cfg.get("input_file", f"{prefix}.pw2wan.in")
+
+    pw2_input_path = os.path.join(work_dir, pw2_input)
+    if not os.path.exists(pw2_input_path):
+        raise FileNotFoundError(f"缺少 pw2wannier90 输入文件: {pw2_input_path}")
+
+    print("开始执行 Wannier90 流程（-pp -> pw2wannier90 -> wannier90）...")
+    subprocess.run(f'{exec_path} -pp "{prefix}"', shell=True, check=True, cwd=work_dir)
+    subprocess.run(f'{pw2_exec_path} < "{pw2_input}"', shell=True, check=True, cwd=work_dir)
+    subprocess.run(f'{exec_path} "{prefix}"', shell=True, check=True, cwd=work_dir)
 
 
 def write_win(
@@ -275,6 +304,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="准备 Wannier90 .win 输入文件")
     parser.add_argument("-i", "--input", default="POSCAR", help="结构文件 (VASP POSCAR)")
     parser.add_argument("-c", "--config", required=True, help="配置文件 (TOML/JSON)")
+    parser.add_argument("--run", action="store_true", help="生成文件后直接执行 Wannier90 流程")
     args = parser.parse_args()
 
     work_dir = "wannier90"
@@ -311,6 +341,8 @@ def main() -> None:
     write_win(output, struct, cfg, kpoints, band_segments)
     create_run_script(work_dir, basename, cfg)
     print(f"已生成 {output}，包含 {len(kpoints)} 个 k 点。")
+    if args.run:
+        run_wannier90_pipeline(work_dir, basename, cfg)
 
 
 if __name__ == "__main__":
