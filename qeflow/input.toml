@@ -23,34 +23,28 @@ ulimit -s unlimited
 # QE pw.x 参数自定义 (Namelists)
 [qe_params.CONTROL]
 outdir = "'./tmp'"
-pseudo_dir = "'~/pseudo/qe'"
+pseudo_dir = "'~/pot/SSSP_1.3.0_PBE_efficiency'"
 
 [qe_params.SYSTEM]
 ecutwfc = 60.0
 ecutrho = 480.0
 occupations = "'smearing'"
-smearing = "'methfessel-paxton'"
+smearing = "'gauss'"
 degauss = 0.02
 
 [qe_params.ELECTRONS]
 conv_thr = 1.0e-8
 mixing_beta = 0.7
 
-# 元素与赝势文件的映射关系 (质量将自动获取，此处仅需配置赝势文件名)
-[pseudo_map]
-Si = { pseudo = "Si.pbe-n-rrkjus_psl.1.0.0.UPF" }
-O  = { pseudo = "O.pbe-n-kkjus_psl.0.1.UPF" }
-Al = { pseudo = "Al.pbe-n-kjpaw_psl.1.0.0.UPF" }
-Fe = { pseudo = "Fe.pbe-n-kjpaw_psl.1.0.0.UPF" }
-
 [k_points]
 # kpoints 优先：直接指定均匀网格 (n1, n2, n3)
 kpoints = [6, 6, 6]
 # 当未提供 kpoints 时，kmesh 表示 K 点间距 (2pi/Angstrom)，用于自动生成均匀网格
-kmesh = 0.3
+# kmesh = 0.3
 # wan = true 时只写 K 点坐标，不写权重；wan = false 时写入权重
 wan = false
 
-# NSCF 特有参数覆盖 (可选)
-[nscf_params.SYSTEM]
-occupations = "'tetrahedra'"
+# 元素与赝势文件的映射关系
+[pseudo_map]
+Y = { pseudo = "Y_pbe_v1.uspp.F.UPF " }
+H = { pseudo = "H.pbe-rrkjus_psl.1.0.0.UPF" }

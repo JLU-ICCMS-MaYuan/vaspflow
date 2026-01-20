@@ -28,7 +28,7 @@ def get_formula(elements, counts):
     formula = ""
     for el, count in zip(elements, counts):
         formula += el
-        if count > 1:
+        if count >= 1:
             formula += str(count)
     return formula
 
@@ -163,13 +163,13 @@ class QENSCFSetup:
                 for y in range(n2):
                     for z in range(n3):
                         # 格式化输出 k 点信息
-                        kpoints_coords.append(f"{x/n1:12.8f}{y/n2:12.8f}{z/n3:12.8f}{1/totpts:14.6e}")
+                        kpoints_coords.append(f"{x/n1:21.17f}{y/n2:21.17f}{z/n3:21.17f}{1/totpts:14.6e}")
         else:  # 只写前三列写k点倒空间分数坐标
             for x in range(n1):
                 for y in range(n2):
                     for z in range(n3):
                         # 格式化输出 k 点信息（没有权重）
-                        kpoints_coords.append(f"{x/n1:12.8f}{y/n2:12.8f}{z/n3:12.8f}")
+                        kpoints_coords.append(f"{x/n1:21.17f}{y/n2:21.17f}{z/n3:21.17f}")
         return kpoints_coords, totpts
 
     def generate_qe_input(self, struct_info):

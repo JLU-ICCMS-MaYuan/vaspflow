@@ -28,7 +28,7 @@ def get_formula(elements, counts):
     formula = ""
     for el, count in zip(elements, counts):
         formula += el
-        if count > 1:
+        if count >= 1:
             formula += str(count)
     return formula
 
@@ -225,14 +225,14 @@ class QESetup:
             for el_idx, el in enumerate(struct_info["elements"]):
                 for _ in range(struct_info["counts"][el_idx]):
                     pos = struct_info["positions"][atom_idx]
-                    f.write(f"  {el:3} {pos[0]:12.8f} {pos[1]:12.8f} {pos[2]:12.8f}\n")
+                    f.write(f"  {el:3} {pos[0]:21.17f} {pos[1]:21.17f} {pos[2]:21.17f}\n")
                     atom_idx += 1
             f.write("\n")
             
             # CELL_PARAMETERS
             f.write("CELL_PARAMETERS {angstrom}\n")
             for vec in struct_info["lattice"]:
-                f.write(f"  {vec[0]:12.8f} {vec[1]:12.8f} {vec[2]:12.8f}\n")
+                f.write(f"  {vec[0]:21.17f} {vec[1]:21.17f} {vec[2]:21.17f}\n")
             f.write("\n")
             
             # K_POINTS：支持显式 kpoints 或按 kmesh 生成自动网格
