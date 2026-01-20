@@ -4,8 +4,8 @@
 
 功能：
 - 读取 POSCAR 获取晶格与原子坐标（保留 Direct/Cartesian 体系）。
-- 读取配置 (TOML/JSON) 设置投影、能窗、k 点网格/路径等。
-- 生成包含 unit_cell_cart、atoms_*、projections、mp_grid、kpoints 的 .win 文件。
+- 读取配置 (TOML/JSON) 设置投影、能窗、k 点网格等；kpoint_path 优先从 vaspkit 303 生成的 KPATH.in 读取。
+- 生成包含 unit_cell_cart、atoms_*、projections、mp_grid、kpoints、可选 kpoint_path 的 .win 文件。
 
 示例：
 python wannier90flow/prepare_wannier90.py \
@@ -112,6 +112,33 @@ def generate_kpoints_from_grid(grid: List[int]) -> List[Tuple[float, float, floa
     return kpts
 
 
+def parse_kpath(path: str) -> List[Dict[str, Any]]:
+    """
+    解析 vaspkit 303 生成的 KPATH.in，提取能带路径段。
+    期望行格式：Label1 k1x k1y k1z Label2 k2x k2y k2z
+    """
+    segments: List[Dict[str, Any]] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) != 8:
+                # 兼容含有前缀数字的行，如 "4\n" 或 header
+                continue
+            from_label, k1x, k1y, k1z, to_label, k2x, k2y, k2z = parts
+            segments.append(
+                {
+                    "from": from_label,
+                    "from_k": [float(k1x), float(k1y), float(k1z)],
+                    "to": to_label,
+                    "to_k": [float(k2x), float(k2y), float(k2z)],
+                }
+            )
+    return segments
+
+
 def format_vector(vec: List[float]) -> str:
     return f"{vec[0]:16.10f} {vec[1]:16.10f} {vec[2]:16.10f}"
 
@@ -125,12 +152,12 @@ def write_win(
     struct: Dict[str, Any],
     cfg: Dict[str, Any],
     kpoints: List[Tuple[float, float, float]],
+    band_path: List[Dict[str, Any]],
 ) -> None:
     """写出 .win 文件。"""
     system_name = cfg.get("system_name") or struct["comment"] or "wannier_system"
     projections = cfg.get("projections", {}).get("list") or cfg.get("projections") or []
     kpt_cfg = cfg.get("k_points", {})
-    band_path = cfg.get("band_path", {}).get("segments", [])
 
     # 必选参数检查
     if not projections:
@@ -242,12 +269,20 @@ def main() -> None:
     else:
         raise ValueError("k_points 配置缺少 mp_grid 或 kpoints。")
 
+    kpath_file = kpt_cfg.get("kpath_file", "KPATH.in")
+    band_segments: List[Dict[str, Any]] = []
+    if os.path.exists(kpath_file):
+        band_segments = parse_kpath(kpath_file)
+        print(f"从 {kpath_file} 读取到 {len(band_segments)} 段能带路径。")
+    else:
+        print(f"未找到 {kpath_file}，将不写入 kpoint_path（可先用 vaspkit 303 生成）。")
+
     output = args.output
     if output is None:
         basename = cfg.get("system_name") or "wannier90"
         output = f"{basename}.win"
 
-    write_win(output, struct, cfg, kpoints)
+    write_win(output, struct, cfg, kpoints, band_segments)
     print(f"已生成 {output}，包含 {len(kpoints)} 个 k 点。")
 
 
