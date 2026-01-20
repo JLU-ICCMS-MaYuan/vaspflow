@@ -44,9 +44,9 @@ Al = { pseudo = "Al.pbe-n-kjpaw_psl.1.0.0.UPF" }
 Fe = { pseudo = "Fe.pbe-n-kjpaw_psl.1.0.0.UPF" }
 
 [k_points]
-# kpoints_dense 优先：直接指定 K 点均匀网格
-kpoints_dense = [6, 6, 6]
-# 当未提供 kpoints_dense 时，kmesh 表示 K 点间距 (2pi/Angstrom)，用于自动生成均匀网格
+# kpoints 优先：直接指定均匀网格 (n1, n2, n3)
+kpoints = [6, 6, 6]
+# 当未提供 kpoints 时，kmesh 表示 K 点间距 (2pi/Angstrom)，用于自动生成均匀网格
 kmesh = 0.3
 # wan = true 时只写 K 点坐标，不写权重；wan = false 时写入权重
 wan = false

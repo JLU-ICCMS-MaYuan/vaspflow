@@ -35,6 +35,7 @@ def get_formula(elements, counts):
 class QESetup:
     def __init__(self, config_file="input.toml", struct_file=None):
         self.work_dir = "qe_scf"
+        self.k_points_config = {}
         # 1. 加载配置文件
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"找不到配置文件: {config_file}")
@@ -46,6 +47,7 @@ class QESetup:
             self.config = toml.load(config_file)
         
         self.struct_file = struct_file
+        self.k_points_config = self.config.get("k_points", {})
         
         # 2. 默认 QE 参数模板 (Namelists)
         self.qe_params = {
@@ -233,11 +235,17 @@ class QESetup:
                 f.write(f"  {vec[0]:12.8f} {vec[1]:12.8f} {vec[2]:12.8f}\n")
             f.write("\n")
             
-            # K_POINTS
-            kmesh_val = self.config.get("kmesh", 0.04)
-            kpts = self.get_kpoints(struct_info["lattice"], kmesh_val)
+            # K_POINTS：支持显式 kpoints 或按 kmesh 生成自动网格
+            kpoints_list = self.k_points_config.get("kpoints")
+            kmesh_val = self.k_points_config.get("kmesh", 0.04)
+
+            if isinstance(kpoints_list, list) and len(kpoints_list) == 3:
+                kpts = kpoints_list
+            else:
+                kpts = self.get_kpoints(struct_info["lattice"], kmesh_val)
+
             f.write("K_POINTS automatic\n")
-            f.write(f"  {kpts[0]} {kpts[1]} {kpts[2]} 0 0 0\n")
+            f.write(f"  {int(kpts[0])} {int(kpts[1])} {int(kpts[2])} 0 0 0\n")
 
     def create_run_script(self):
         """创建运行脚本"""

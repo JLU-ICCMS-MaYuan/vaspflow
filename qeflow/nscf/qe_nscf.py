@@ -262,11 +262,11 @@ class QENSCFSetup:
             f.write("\n")
             
             # K_POINTS：仅从 [k_points] 读取
-            kpoints_dense = self.k_points_config.get("kpoints_dense")
+            kpoints_list = self.k_points_config.get("kpoints")
             kmesh_val = self.k_points_config.get("kmesh")
 
-            if kpoints_dense is not None:
-                final_kmesh = kpoints_dense
+            if kpoints_list is not None:
+                final_kmesh = kpoints_list
             elif kmesh_val is not None:
                 final_kmesh = self.get_kpoints(struct_info["lattice"], kmesh_val)
             else:

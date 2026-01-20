@@ -2,12 +2,14 @@
 
 ## 需求处理记录
 
-### [2026-01-20] QE NSCF K 点配置迁移至 [k_points]
+### [2026-01-20] QE K 点配置统一至 [k_points]
 - **需求**：
-    1. 删除 `[nscf]` 中的 K 点配置，统一使用 `[k_points]` 管理 NSCF K 点设置。
+    1. 删除 `[nscf]` 中的 K 点配置，统一在 `[k_points]` 管理 NSCF/SCF 的 K 点设置。
+    2. `qe_scf.py` 需支持两种方式：`kmesh` 自动生成网格，或 `kpoints` 显式网格（SCF 直接写入 `K_POINTS automatic`）。
 - **方案**：
-    1. 更新 `qeflow/nscf/qe_nscf.py`，仅从 `[k_points]` 读取 `kpoints_dense` 或 `kmesh`（`wan` 同步迁移），未配置时使用默认间距生成均匀网格。
-    2. 调整 `qeflow/input.toml`，移除 `[nscf]` 示例并新增 `[k_points]` 配置说明，保留 `[nscf_params]` 供 NSCF 参数覆盖。
+    1. 更新 `qeflow/nscf/qe_nscf.py`，仅从 `[k_points]` 读取 `kpoints` 或 `kmesh`（`wan` 同步迁移），未配置时使用默认间距生成均匀网格。
+    2. 更新 `qeflow/scf/qe_scf.py`，支持 `[k_points].kpoints` 优先，其次 `kmesh` 生成自动网格，不写显式坐标。
+    3. 调整 `qeflow/input.toml`，将示例字段改为 `[k_points].kpoints`/`kmesh`，保留 `[nscf_params]` 供 NSCF 参数覆盖。
 - **状态**：已完成。
 
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
