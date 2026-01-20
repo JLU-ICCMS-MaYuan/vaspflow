@@ -1,0 +1,36 @@
+system_name = "Ce1Sc2H24"
+num_wann = 41
+num_bands = 50        # num_bands = nbnd - exclude_bands
+exclude_bands = "1:29"
+iprint = 2
+num_iter = 500
+dis_num_iter = 200
+dis_froz_min = 8.0
+dis_froz_max = 32.62
+dis_win_min = 15.0    # 视 nscf.out 调整
+dis_win_max = 41.0
+write_hr = true
+write_bvec = true
+bands_plot = true
+bands_plot_format = "gnuplot"
+
+[projections]
+list = ["Ce:f", "Sc:d", "H:s"]
+
+[k_points]
+mp_grid = [6, 6, 6]
+# 可选：若提供显式 kpoints 列表则覆盖 mp_grid 自动生成
+# kpoints = [
+#   [0.0, 0.0, 0.0],
+# ]
+
+[band_path]
+segments = [
+  { from = "G", from_k = [0.0, 0.0, 0.0], to = "M", to_k = [0.5, 0.0, 0.0] },
+  { from = "M", from_k = [0.5, 0.0, 0.0], to = "K", to_k = [0.3333, 0.3333, 0.0] },
+  { from = "K", from_k = [0.3333, 0.3333, 0.0], to = "G", to_k = [0.0, 0.0, 0.0] },
+  { from = "G", from_k = [0.0, 0.0, 0.0], to = "A", to_k = [0.0, 0.0, 0.5] },
+  { from = "A", from_k = [0.0, 0.0, 0.5], to = "L", to_k = [0.5, 0.0, 0.5] },
+  { from = "L", from_k = [0.5, 0.0, 0.5], to = "H", to_k = [0.3333, 0.3333, 0.5] },
+  { from = "H", from_k = [0.3333, 0.3333, 0.5], to = "A", to_k = [0.0, 0.0, 0.5] },
+]
