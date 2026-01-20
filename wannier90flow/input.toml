@@ -1,3 +1,4 @@
+[win]
 system_name = "Ce1Sc2H24"
 num_wann = 41
 num_bands = 50        # num_bands = nbnd - exclude_bands

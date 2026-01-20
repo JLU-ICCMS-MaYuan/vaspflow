@@ -180,6 +180,21 @@ def create_run_script(work_dir: str, prefix: str, cfg: Dict[str, Any]) -> None:
     print(f"已生成提交脚本: {script_path}")
 
 
+def create_slurm_script(work_dir: str, cfg: Dict[str, Any]) -> None:
+    slurm_cfg = cfg.get("slurm", {})
+    slurm_header = slurm_cfg.get("header", "#!/bin/bash")
+    script_name = slurm_cfg.get("script_name", "run_wannier90.slurm")
+
+    script_path = os.path.join(work_dir, script_name)
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(slurm_header.strip() + "\n\n")
+        f.write("set -e\n")
+        f.write('cd "$(dirname "$0")"\n\n')
+        f.write('bash ./run_wannier90.sh\n')
+    os.chmod(script_path, 0o755)
+    print(f"已生成 Slurm 脚本: {script_path}")
+
+
 def run_wannier90_pipeline(work_dir: str, prefix: str, cfg: Dict[str, Any]) -> None:
     w90_cfg = cfg.get("wannier90", {})
     exec_path = w90_cfg.get("executable_path", "wannier90.x")
@@ -205,7 +220,8 @@ def write_win(
     band_path: List[Dict[str, Any]],
 ) -> None:
     """写出 .win 文件。"""
-    system_name = cfg.get("system_name") or struct["comment"] or "wannier_system"
+    win_cfg = cfg.get("win", {})
+    system_name = win_cfg.get("system_name") or cfg.get("system_name") or struct["comment"] or "wannier_system"
     projections = cfg.get("projections", {}).get("list") or cfg.get("projections") or []
     kpt_cfg = cfg.get("k_points", {})
 
@@ -213,38 +229,51 @@ def write_win(
     if not projections:
         raise ValueError("配置缺少投影 (projections)。")
 
-    num_wann = cfg.get("num_wann")
+    num_wann = win_cfg.get("num_wann", cfg.get("num_wann"))
     if num_wann is None:
         raise ValueError("配置缺少 num_wann。")
 
     with open(output, "w", encoding="utf-8") as f:
         f.write(f"num_wann = {int(num_wann)}\n")
-        if "num_bands" in cfg:
-            f.write(f"num_bands = {int(cfg['num_bands'])}\n")
-        if "exclude_bands" in cfg:
-            f.write(f"exclude_bands = {cfg['exclude_bands']}\n")
-        if "iprint" in cfg:
-            f.write(f"iprint = {int(cfg['iprint'])}\n")
-        if "num_iter" in cfg:
-            f.write(f"num_iter = {int(cfg['num_iter'])}\n")
-        if "dis_num_iter" in cfg:
-            f.write(f"dis_num_iter = {int(cfg['dis_num_iter'])}\n")
-        if "dis_froz_min" in cfg:
-            f.write(f"dis_froz_min = {float(cfg['dis_froz_min']):12.6f}\n")
-        if "dis_froz_max" in cfg:
-            f.write(f"dis_froz_max = {float(cfg['dis_froz_max']):12.6f}\n")
-        if "dis_win_min" in cfg:
-            f.write(f"dis_win_min = {float(cfg['dis_win_min']):12.6f}\n")
-        if "dis_win_max" in cfg:
-            f.write(f"dis_win_max = {float(cfg['dis_win_max']):12.6f}\n")
-        if "write_hr" in cfg:
-            f.write(f"write_hr = {str(cfg['write_hr']).lower()}\n")
-        if "write_bvec" in cfg:
-            f.write(f"write_bvec = {str(cfg['write_bvec']).lower()}\n")
-        if "bands_plot" in cfg:
-            f.write(f"bands_plot = {str(cfg['bands_plot']).lower()}\n")
-        if "bands_plot_format" in cfg:
-            f.write(f"bands_plot_format = {cfg['bands_plot_format']}\n")
+        num_bands = win_cfg.get("num_bands", cfg.get("num_bands"))
+        if num_bands is not None:
+            f.write(f"num_bands = {int(num_bands)}\n")
+        exclude_bands = win_cfg.get("exclude_bands", cfg.get("exclude_bands"))
+        if exclude_bands is not None:
+            f.write(f"exclude_bands = {exclude_bands}\n")
+        iprint = win_cfg.get("iprint", cfg.get("iprint"))
+        if iprint is not None:
+            f.write(f"iprint = {int(iprint)}\n")
+        num_iter = win_cfg.get("num_iter", cfg.get("num_iter"))
+        if num_iter is not None:
+            f.write(f"num_iter = {int(num_iter)}\n")
+        dis_num_iter = win_cfg.get("dis_num_iter", cfg.get("dis_num_iter"))
+        if dis_num_iter is not None:
+            f.write(f"dis_num_iter = {int(dis_num_iter)}\n")
+        dis_froz_min = win_cfg.get("dis_froz_min", cfg.get("dis_froz_min"))
+        if dis_froz_min is not None:
+            f.write(f"dis_froz_min = {float(dis_froz_min):12.6f}\n")
+        dis_froz_max = win_cfg.get("dis_froz_max", cfg.get("dis_froz_max"))
+        if dis_froz_max is not None:
+            f.write(f"dis_froz_max = {float(dis_froz_max):12.6f}\n")
+        dis_win_min = win_cfg.get("dis_win_min", cfg.get("dis_win_min"))
+        if dis_win_min is not None:
+            f.write(f"dis_win_min = {float(dis_win_min):12.6f}\n")
+        dis_win_max = win_cfg.get("dis_win_max", cfg.get("dis_win_max"))
+        if dis_win_max is not None:
+            f.write(f"dis_win_max = {float(dis_win_max):12.6f}\n")
+        write_hr = win_cfg.get("write_hr", cfg.get("write_hr"))
+        if write_hr is not None:
+            f.write(f"write_hr = {str(write_hr).lower()}\n")
+        write_bvec = win_cfg.get("write_bvec", cfg.get("write_bvec"))
+        if write_bvec is not None:
+            f.write(f"write_bvec = {str(write_bvec).lower()}\n")
+        bands_plot = win_cfg.get("bands_plot", cfg.get("bands_plot"))
+        if bands_plot is not None:
+            f.write(f"bands_plot = {str(bands_plot).lower()}\n")
+        bands_plot_format = win_cfg.get("bands_plot_format", cfg.get("bands_plot_format"))
+        if bands_plot_format is not None:
+            f.write(f"bands_plot_format = {bands_plot_format}\n")
 
         f.write(f"mp_grid = {' '.join(str(int(x)) for x in kpt_cfg.get('mp_grid', []))}\n")
         f.write("\n")
@@ -335,11 +364,13 @@ def main() -> None:
     else:
         print(f"未找到 {kpath_file}，将不写入 kpoint_path（可先在 {work_dir} 运行 vaspkit 303 生成）。")
 
-    basename = cfg.get("system_name") or struct["comment"] or "wannier90"
+    win_cfg = cfg.get("win", {})
+    basename = win_cfg.get("system_name") or cfg.get("system_name") or struct["comment"] or "wannier90"
     output = os.path.join(work_dir, f"{basename}.win")
 
     write_win(output, struct, cfg, kpoints, band_segments)
     create_run_script(work_dir, basename, cfg)
+    create_slurm_script(work_dir, cfg)
     print(f"已生成 {output}，包含 {len(kpoints)} 个 k 点。")
     if args.run:
         run_wannier90_pipeline(work_dir, basename, cfg)

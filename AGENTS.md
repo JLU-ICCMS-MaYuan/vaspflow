@@ -45,6 +45,13 @@
     3. 运行脚本中加入 `pw2wannier90` 输入文件检查。
 - **状态**：已完成。
 
+### [2026-01-20] Wannier90 配置归并与 Slurm 脚本准备
+- **需求**：将 .win 相关参数归并到 `[win]`，并增加 Slurm 脚本生成。
+- **方案**：
+    1. `wannier90flow/input.toml` 与 `tests/inputwannier.toml` 的 .win 参数移动至 `[win]`，读取逻辑兼容旧顶层参数。
+    2. 在 `wannier90flow/wannier_init.py` 生成 `run_wannier90.slurm`，调用 `run_wannier90.sh` 执行流程。
+- **状态**：已完成。
+
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
 - **需求**：
     1. 在 `qeflow` 目录下增加 `qe_scf.py`。
