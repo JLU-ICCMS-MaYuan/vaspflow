@@ -1,7 +1,10 @@
 tests/
-
-
 __pycache__/
 *.egg-info/
 node_modules/
+
 package-lock.json
+
+wannier90flow/solution_booklet.pdf
+wannier90flow/tutorial.pdf
+wannier90flow/user_guide.pdf
