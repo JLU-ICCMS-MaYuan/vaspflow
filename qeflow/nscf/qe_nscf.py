@@ -308,50 +308,53 @@ class QENSCFSetup:
         try:
             os.makedirs(self.work_dir, exist_ok=True)
 
-            # 1. 确定结构文件路径 (不再拷贝到工作目录)
-            scf_poscar = os.path.join(self.scf_dir, "POSCAR")
-            
+            # 1. 确定结构文件路径 (只在输入或当前目录查找)
             if self.struct_file:
                 struct_path = self.struct_file
-            elif os.path.exists(scf_poscar):
-                struct_path = scf_poscar
             elif os.path.exists("POSCAR"):
                 struct_path = "POSCAR"
             else:
-                raise FileNotFoundError("找不到结构文件，且无法从 qe_scf 自动获取。")
+                raise FileNotFoundError("找不到结构文件。请在当前目录准备 POSCAR 或使用 -i 指定。")
 
-            # 2. 拷贝 SCF 生成的数据 (outdir 及其内部的 prefix.save)
+            # 2. 解析结构并自动设置 prefix
+            struct_info = self.parse_poscar(struct_path)
+            formula = get_formula(struct_info["elements"], struct_info["counts"])
+            self.qe_params["CONTROL"]["prefix"] = f"'{formula}'"
+
+            # 3. 合并配置文件参数 (如果用户在 input.toml 里指定了 prefix，则以用户为准)
+            if "qe_params" in self.config and "CONTROL" in self.config["qe_params"]:
+                self.qe_params["CONTROL"].update(self.config["qe_params"]["CONTROL"])
+            
+            # 4. 拷贝 SCF 生成的数据 (此时 prefix 已确定)
             outdir_val = self.qe_params["CONTROL"]["outdir"].strip("'").strip('"')
             prefix_val = self.qe_params["CONTROL"]["prefix"].strip("'").strip('"')
 
             save_dir_name = f"{prefix_val}.save"
-            src_out_base = os.path.join(self.scf_dir, outdir_val)
-            src_save_path = os.path.join(src_out_base, save_dir_name)
-
-            dst_out_base = os.path.join(self.work_dir, outdir_val)
-            dst_save_path = os.path.join(dst_out_base, save_dir_name)
+            src_save_path = os.path.join(self.scf_dir, outdir_val, save_dir_name)
+            dst_save_path = os.path.join(self.work_dir, outdir_val, save_dir_name)
 
             if os.path.exists(src_save_path):
-                # 创建目标 outdir 和 .save 目录层级
                 os.makedirs(dst_save_path, exist_ok=True)
-                
-                # 仅拷贝 NSCF 必需的三个关键文件
                 needed_files = ["data-file-schema.xml", "charge-density.dat", "paw.txt"]
                 for filename in needed_files:
                     src_file = os.path.join(src_save_path, filename)
                     dst_file = os.path.join(dst_save_path, filename)
                     if os.path.exists(src_file):
                         shutil.copy2(src_file, dst_file)
-                        print(f"已拷贝: {filename}")
-                    else:
-                        if filename != "paw.txt": # paw.txt 可能不存在（非 PAW 赝势）
-                            print(f"警告: 找不到必要文件 {src_file}")
-                
+                        print(f"已拷贝 SCF 数据: {filename}")
                 print(f"已从 {src_save_path} 准备好 NSCF 所需的关键数据。")
             else:
-                print(f"警告: 找不到 SCF 的数据目录 {src_save_path}")
+                print(f"警告: 找不到 SCF 的数据目录 {src_save_path}，计算可能会失败。")
 
-            struct_info = self.parse_poscar(struct_path)
+            # 5. 生成输入文件
+            self.generate_qe_input(struct_info)
+            self.create_run_script()
+            
+            print(f"\n所有 QE NSCF 输入文件及数据已在 {self.work_dir} 目录中准备就绪！")
+                
+        except Exception as e:
+            print(f"准备 NSCF 环境出错: {e}")
+            raise
             self.generate_qe_input(struct_info)
             self.create_run_script()
             
