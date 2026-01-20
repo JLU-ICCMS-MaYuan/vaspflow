@@ -24,7 +24,7 @@ ulimit -s unlimited
 
 # QE pw.x 参数自定义 (Namelists)
 [qe_params.CONTROL]
-outdir = "'./out'"
+outdir = "'./tmp'"
 pseudo_dir = "'~/pseudo/qe'"
 
 [qe_params.SYSTEM]
