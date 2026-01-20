@@ -269,10 +269,14 @@ def write_win(
         if write_bvec is not None:
             f.write(f"write_bvec = {str(write_bvec).lower()}\n")
         bands_plot = win_cfg.get("bands_plot", cfg.get("bands_plot"))
-        if bands_plot is not None:
-            f.write(f"bands_plot = {str(bands_plot).lower()}\n")
         bands_plot_format = win_cfg.get("bands_plot_format", cfg.get("bands_plot_format"))
-        if bands_plot_format is not None:
+        has_band_path = len(band_path) > 0
+        if bands_plot is not None:
+            if bands_plot and not has_band_path:
+                print("提示：已请求 bands_plot，但未找到 kpoint_path，将自动关闭 bands_plot。")
+                bands_plot = False
+            f.write(f"bands_plot = {str(bands_plot).lower()}\n")
+        if bands_plot_format is not None and bands_plot:
             f.write(f"bands_plot_format = {bands_plot_format}\n")
 
         f.write(f"mp_grid = {' '.join(str(int(x)) for x in kpt_cfg.get('mp_grid', []))}\n")

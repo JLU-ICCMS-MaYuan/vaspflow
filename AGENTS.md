@@ -52,6 +52,13 @@
     2. 在 `wannier90flow/wannier_init.py` 生成 `run_wannier90.slurm`，调用 `run_wannier90.sh` 执行流程。
 - **状态**：已完成。
 
+### [2026-01-20] Wannier90 bands_plot 与 kpoint_path 联动
+- **需求**：避免在未提供 `kpoint_path` 时仍写入 `bands_plot = .true.` 导致 wannier90 报错。
+- **方案**：
+    1. `wannier90flow/wannier_init.py` 中当 `bands_plot` 为 true 且未检测到 `kpoint_path` 时自动关闭，并提示。
+    2. `tests/inputwannier.toml` 默认关闭 `bands_plot`，避免无路径时报错。
+- **状态**：已完成。
+
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
 - **需求**：
     1. 在 `qeflow` 目录下增加 `qe_scf.py`。
