@@ -84,7 +84,15 @@ def main():
 
     eng_full = get_energies(args.xml)
 
-    def plot_band_ranges(start_band: int, end_band: int, output_path: str) -> None:
+    def plot_band_ranges(
+        start_band: int,
+        end_band: int,
+        dis_froz_min: float,
+        dis_froz_max: float,
+        dis_win_min: float,
+        dis_win_max: float,
+        output_path: str,
+    ) -> None:
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -98,10 +106,15 @@ def main():
         fig, ax = plt.subplots(figsize=(8, 6))
         for idx, emin, emax in zip(band_indices, band_mins, band_maxs):
             ax.bar(idx, emax - emin, bottom=emin, width=0.6, color="red", alpha=0.3, edgecolor="red")
+        ax.axhline(dis_froz_min, color="red", linestyle="--", linewidth=1.2, label="dis_froz_min")
+        ax.axhline(dis_froz_max, color="red", linestyle="--", linewidth=1.2, label="dis_froz_max")
+        ax.axhline(dis_win_min, color="black", linestyle="--", linewidth=1.2, label="dis_win_min")
+        ax.axhline(dis_win_max, color="black", linestyle="--", linewidth=1.2, label="dis_win_max")
         ax.set_xlabel("Band Index")
         ax.set_ylabel("Energy")
         ax.set_title("Energy spectrum of bands")
         ax.set_xticks(band_indices)
+        ax.legend(frameon=False, loc="upper left")
         fig.tight_layout()
         fig.savefig(output_path, dpi=300)
         plt.close(fig)
@@ -193,7 +206,18 @@ def main():
         print(f"dis_froz_max = {dis_froz_max:.6f}")
         print(f"dis_win_min = {dis_win_min:.6f}")
         print(f"dis_win_max = {dis_win_max:.6f}")
-        plot_band_ranges(nbnd1, nbnd2, "band_ranges.png")
+        plot_end = nbnd_win + 8
+        if plot_end > len(eng_full[0]):
+            plot_end = len(eng_full[0])
+        plot_band_ranges(
+            nbnd1,
+            plot_end,
+            dis_froz_min,
+            dis_froz_max,
+            dis_win_min,
+            dis_win_max,
+            "band_ranges.png",
+        )
 
 
 if __name__ == "__main__":

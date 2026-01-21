@@ -113,7 +113,7 @@
 
 ### [2026-01-21] Wannier90 自动能窗绘图
 - **需求**：`--auto` 完成后绘制能带能量范围图，并保存为 `band_ranges.png`。
-- **方案**：在 `wannier90flow/wannier_window.py` 中使用 matplotlib 绘制 `nbnd1..nbnd2` 的能带能量区间柱状图，若缺少 matplotlib 则提示跳过。
+- **方案**：在 `wannier90flow/wannier_window.py` 中使用 matplotlib 绘制 `nbnd1..(nbnd_win+8)` 的能带能量区间柱状图，并标出 `dis_froz_min/max` 与 `dis_win_min/max` 虚线，若缺少 matplotlib 则提示跳过。
 - **状态**：已完成。
 
 ### [2026-01-21] Wannier90flow 使用方法文档
