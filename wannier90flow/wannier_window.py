@@ -149,7 +149,9 @@ def main():
             if nbnd2 < nbnd1:
                 parser.error("自适应失败：nbnd2 已小于 nbnd1")
             dis_froz_max = max(eng[nbnd2 - 1] for eng in eng_full)
-            if max_band_count(dis_froz_min, dis_froz_max) <= num_wann:
+            max_count = max_band_count(dis_froz_min, dis_froz_max)
+            print(f"auto: nbnd2={nbnd2}, dis_froz_max={dis_froz_max:.6f}, max_nbnd={max_count}")
+            if max_count <= num_wann:
                 break
             nbnd2 -= 1
 
