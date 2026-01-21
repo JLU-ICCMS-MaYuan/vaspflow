@@ -1,0 +1,3 @@
+[submodule "wannier90flow/external/wannier90"]
+	path = wannier90flow/external/wannier90
+	url = git@github.com:JLU-ICCMS-MaYuan/wannier90.git

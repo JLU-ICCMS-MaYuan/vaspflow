@@ -111,6 +111,11 @@
 - **方案**：新增 `--auto-delta` 参数并应用到 `dis_froz_min/max` 与 `dis_win_min/max`。
 - **状态**：已完成。
 
+### [2026-01-21] Wannier90flow 使用方法文档
+- **需求**：补充 `wannier_init` 与 `wannier_window` 的使用方法说明。
+- **方案**：新增 `wannier90flow/README.md`，包含功能、示例与参数说明。
+- **状态**：已完成。
+
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
 - **需求**：
     1. 在 `qeflow` 目录下增加 `qe_scf.py`。
