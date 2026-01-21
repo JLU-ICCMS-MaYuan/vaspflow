@@ -130,7 +130,7 @@ def main():
         if nbnd1 > len(eng_full[0]):
             parser.error("nbnd1 超出能带数量")
 
-        dis_froz_min = min(eng[nbnd1 - 1] for eng in eng_full)
+        dis_froz_min = min(eng[nbnd1 - 1] for eng in eng_full) - 0.02
         dis_win_min = dis_froz_min
 
         nbnd2 = nbnd1 + num_wann
@@ -148,7 +148,7 @@ def main():
         while True:
             if nbnd2 < nbnd1:
                 parser.error("自适应失败：nbnd2 已小于 nbnd1")
-            dis_froz_max = max(eng[nbnd2 - 1] for eng in eng_full)
+            dis_froz_max = max(eng[nbnd2 - 1] for eng in eng_full) + 0.02
             max_count = max_band_count(dis_froz_min, dis_froz_max)
             print(f"auto: nbnd2={nbnd2}, dis_froz_max={dis_froz_max:.6f}, max_nbnd={max_count}")
             if max_count <= num_wann:
@@ -158,7 +158,7 @@ def main():
         nbnd_win = nbnd2 + nbnd3
         if nbnd_win > len(eng_full[0]):
             parser.error("nbnd2 + nbnd3 超出能带数量")
-        dis_win_max = max(eng[nbnd_win - 1] for eng in eng_full)
+        dis_win_max = max(eng[nbnd_win - 1] for eng in eng_full) + 0.02
 
         print(f"dis_froz_min = {dis_froz_min:.6f}")
         print(f"dis_froz_max = {dis_froz_max:.6f}")

@@ -101,6 +101,11 @@
 - **方案**：在自适应循环中输出 `nbnd2/dis_froz_max/max_nbnd`。
 - **状态**：已完成。
 
+### [2026-01-21] Wannier90 自动能窗边界偏移
+- **需求**：`--auto` 计算的 `dis_froz_min/dis_win_min` 使用最小值减 0.02，`dis_froz_max/dis_win_max` 使用最大值加 0.02。
+- **方案**：在 `wannier90flow/wannier_window.py` 中对自动能窗边界增加 ±0.02 偏移。
+- **状态**：已完成。
+
 ### [2026-01-19] 功能扩展与规范化：Quantum ESPRESSO 支持及目录命名规范
 - **需求**：
     1. 在 `qeflow` 目录下增加 `qe_scf.py`。
