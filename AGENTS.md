@@ -123,6 +123,11 @@
     2. `tests/inputwannier.toml` 增加参数并写明功能说明。
 - **状态**：已完成。
 
+### [2026-01-21] wvfn_formatted 写入 .win
+- **需求**：`wvfn_formatted` 应写入 `*.win` 而非 `pw2wan`。
+- **方案**：从 `pw2wan` 生成逻辑移除该字段，改为写入 `*.win`，并在 `tests/inputwannier.toml` 的 `[win]` 中说明。
+- **状态**：已完成。
+
 ### [2026-01-21] 移除误添加的子模块
 - **需求**：撤销误引入的 `wannier90flow/external/wannier90` 子模块配置。
 - **方案**：删除 `.gitmodules` 并移除子模块记录，清理 README 引用。
