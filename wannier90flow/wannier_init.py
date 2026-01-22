@@ -403,8 +403,8 @@ def write_win(
                 k1 = seg.get("from_k", [0.0, 0.0, 0.0])
                 k2 = seg.get("to_k", [0.0, 0.0, 0.0])
                 f.write(
-                    f"{from_label:2} {k1[0]:8.4f} {k1[1]:8.4f} {k1[2]:8.4f} "
-                    f"{to_label:2} {k2[0]:8.4f} {k2[1]:8.4f} {k2[2]:8.4f}\n"
+                    f"{from_label:6} {k1[0]:8.4f} {k1[1]:8.4f} {k1[2]:8.4f}   "
+                    f"{to_label:6} {k2[0]:8.4f} {k2[1]:8.4f} {k2[2]:8.4f}\n"
                 )
             f.write("end kpoint_path\n\n")
 
