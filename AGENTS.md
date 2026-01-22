@@ -2,6 +2,11 @@
 
 ## 需求处理记录
 
+### [2026-01-22] wannier_init 复制输入结构到工作目录
+- **需求**：`-i` 指定的结构文件需拷贝到 `work_dir` 下并命名为 `POSCAR`。
+- **方案**：在 `wannier90flow/wannier_init.py` 中解析结构后，复制输入文件到 `wannier90/POSCAR`。
+- **状态**：已完成。
+
 ### [2026-01-20] QE K 点配置统一至 [k_points]
 - **需求**：
     1. 删除 `[nscf]` 中的 K 点配置，统一在 `[k_points]` 管理 NSCF/SCF 的 K 点设置。

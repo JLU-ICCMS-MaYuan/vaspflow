@@ -16,6 +16,7 @@ python wannier90flow/wannier_init.py \
 import argparse
 import json
 import os
+import shutil
 import subprocess
 from typing import Any, Dict, List, Tuple
 
@@ -416,6 +417,7 @@ def main() -> None:
     os.makedirs(work_dir, exist_ok=True)
 
     struct = parse_poscar(args.input)
+    shutil.copyfile(args.input, os.path.join(work_dir, "POSCAR"))
     cfg = load_config(args.config)
     kpt_cfg = cfg.get("k_points", {})
     win_cfg = cfg.get("win", {})
