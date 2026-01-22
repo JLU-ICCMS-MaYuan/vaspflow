@@ -446,6 +446,8 @@ def main() -> None:
                 text=True,
                 check=True,
                 cwd=work_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
         except Exception as exc:
             raise RuntimeError("vaspkit 运行失败，无法生成 KPATH.in") from exc
