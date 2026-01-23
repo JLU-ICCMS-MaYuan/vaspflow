@@ -173,6 +173,27 @@
 - **方案**：在 `wannier90flow/wannier_init.py` 中检测 `bands_plot` 并调用 vaspkit 生成 `KPATH.in`，失败则报错退出。
 - **状态**：已完成。
 
+### [2026-01-23] 新增：QE eledos 输入生成脚本
+- **需求**：新增 `qe_eledos.py`，基于 `qe_scf` 的自洽结果生成电子 DOS 所需输入并支持运行。
+- **方案**：
+    1. 新增 `qeflow/eledos/qe_eledos.py`：生成 `eletdos.in/elepdos.in`，拷贝 `qe_scf` 的 `prefix.save` 数据，支持 `--run` 执行 `dos.x/projwfc.x`。
+    2. `pyproject.toml` 注册 `qe_eledos` 入口，`qeflow/input.toml` 补充 `[eledos]` 示例参数。
+- **状态**：已完成。
+
+### [2026-01-23] 新增：QE 投影能带数据处理脚本
+- **需求**：新增 `qe_process_eband.py`，将 `projwfc` 投影能带文件处理为三列数据（横坐标/能量/轨道贡献），并输出所有轨道及 p/d/f 汇总。
+- **方案**：
+    1. 新增 `qeflow/eband/qe_process_eband.py`：解析 `*.projwfc_up/down`，按能带顺序输出各轨道与 p/d/f 汇总，生成 `<prefix>_eleband_proj.dat`。
+    2. `pyproject.toml` 注册 `qe_process_eband` 入口。
+- **状态**：已完成。
+
+### [2026-01-23] 新增：QE 投影 DOS 数据处理脚本
+- **需求**：新增 `qe_process_dos.py`，处理 `*.tdos` 与 `pdos_atm` 文件，输出 DOS/IDOS 表格并包含 TDOS/ITDOS。
+- **方案**：
+    1. 新增 `qeflow/eledos/qe_process_dos.py`：解析 `*.tdos`、`pdos_atm` 与 `projwfc`，生成 `<prefix>_dos_proj*.dat` 与 `<prefix>_idos_proj*.dat`。
+    2. 输出包含同元素轨道汇总与未汇总两种版本，TDOS/ITDOS 置于最后一列。
+- **状态**：已完成。
+
 ### [2026-01-22] vaspkit 303 静默运行
 - **需求**：执行 vaspkit 303 时不打印输出到屏幕。
 - **方案**：调用 vaspkit 时重定向 stdout/stderr 到 DEVNULL。
