@@ -174,6 +174,27 @@ class QEEBandSetup:
         except Exception as e:
             raise RuntimeError(f"vaspkit 运行失败: {e}")
 
+    def write_kpath_labels(self, path_points, lattice):
+        bohr_to_ang = 0.52917721092
+        lattice_bohr = lattice / bohr_to_ang
+        alat_bohr = float(np.linalg.norm(lattice_bohr[0]))
+        # QE 的 scf.out 中倒格子以 2π/alat 为单位；此处按同一单位自算
+        recip_lat = np.linalg.inv(lattice_bohr).T * alat_bohr
+        total_dist = 0.0
+        last_cart = None
+        label_path = os.path.join(self.work_dir, "qe_k_lable.dat")
+        with open(label_path, "w") as f:
+            f.write("# label dist kx ky kz\n")
+            for coords, label in path_points:
+                cart = np.dot(coords, recip_lat)
+                if last_cart is not None:
+                    total_dist += float(np.linalg.norm(cart - last_cart))
+                f.write(
+                    f"{label:8} {total_dist:12.6f} {coords[0]:12.8f} {coords[1]:12.8f} {coords[2]:12.8f}\n"
+                )
+                last_cart = cart
+        print(f"已生成高对称点坐标: {label_path}")
+
     def generate_qe_input(self, struct_info):
         print("正在生成 eband.in ...")
 
@@ -266,6 +287,8 @@ class QEEBandSetup:
             if not path_points:
                 raise ValueError("KPATH.in 未解析到任何高对称点。")
 
+            self.write_kpath_labels(path_points, struct_info["lattice"])
+
             f.write("K_POINTS crystal_b\n")
             f.write(f"{len(path_points)}\n")
             for coords, label in path_points:
@@ -342,13 +365,19 @@ class QEEBandSetup:
 
         original_dir = os.getcwd()
         try:
-            print(f"\n正在进入 {self.work_dir} 目录执行: {pw_path}")
+            work_dir_name = os.path.basename(os.path.normpath(self.work_dir))
             os.chdir(self.work_dir)
-            subprocess.run(f"{pw_path} < eband.in > eband.out", shell=True, check=True)
+            pw_cmd = f"{pw_path} < eband.in > eband.out"
+            print(f"\n正在进入 {work_dir_name} 目录执行: {pw_cmd}")
+            subprocess.run(pw_cmd, shell=True, check=True)
             bands_cmd = f"{bands_exec} {bands_args}".strip() if bands_args else bands_exec
             proj_cmd = f"{proj_exec} {proj_args}".strip() if proj_args else proj_exec
-            subprocess.run(f"{bands_cmd} < elebanddata.in > elebanddata.out", shell=True, check=True)
-            subprocess.run(f"{proj_cmd} < elebandprojdata.in > elebandprojdata.out", shell=True, check=True)
+            bands_full_cmd = f"{bands_cmd} < elebanddata.in > elebanddata.out"
+            print(f"正在进入 {work_dir_name} 目录执行: {bands_full_cmd}")
+            subprocess.run(bands_full_cmd, shell=True, check=True)
+            proj_full_cmd = f"{proj_cmd} < elebandprojdata.in > elebandprojdata.out"
+            print(f"正在进入 {work_dir_name} 目录执行: {proj_full_cmd}")
+            subprocess.run(proj_full_cmd, shell=True, check=True)
             print(f"QE eband 计算完成，输出已保存至 {self.work_dir}")
         except subprocess.CalledProcessError as e:
             print(f"执行 QE eband 出错: {e}")
