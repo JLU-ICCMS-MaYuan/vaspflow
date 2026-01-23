@@ -194,6 +194,11 @@
     2. 输出包含同元素轨道汇总与未汇总两种版本，TDOS/ITDOS 置于最后一列。
 - **状态**：已完成。
 
+### [2026-01-23] 修正：qe_process_eledos 脚本入口
+- **需求**：`qe_process_eledos` 入口需可用。
+- **方案**：`pyproject.toml` 中将 `qe_process_eledos` 指向 `qeflow.eledos.qe_process_dos:main`。
+- **状态**：已完成。
+
 ### [2026-01-22] vaspkit 303 静默运行
 - **需求**：执行 vaspkit 303 时不打印输出到屏幕。
 - **方案**：调用 vaspkit 时重定向 stdout/stderr 到 DEVNULL。
