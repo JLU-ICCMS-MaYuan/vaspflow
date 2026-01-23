@@ -48,3 +48,11 @@ wan = false
 [pseudo_map]
 Y = { pseudo = "Y_pbe_v1.uspp.F.UPF " }
 H = { pseudo = "H.pbe-rrkjus_psl.1.0.0.UPF" }
+
+[eledos]
+# 电子态密度参数
+DeltaE = 0.01
+emin = -10
+emax = 30
+ngauss = 0
+degauss = 0.0
