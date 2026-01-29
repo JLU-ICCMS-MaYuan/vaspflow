@@ -2,6 +2,7 @@
 import argparse
 import glob
 import os
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,13 +28,13 @@ def pick_file(directory, patterns, desc):
     return matches[0]
 
 
-def resolve_inputs(qe_dir, w90_dir, label_file=None):
+def resolve_inputs(qe_dir, w90_dir):
     qe_dir = os.path.abspath(qe_dir)
     w90_dir = os.path.abspath(w90_dir)
 
     qe_band_file = pick_file(
         qe_dir,
-        ["*_band", "*_band.dat", "elebanddata.dat"],
+        ["*_band.gnu"],
         "QE 能带数据",
     )
     w90_band_file = pick_file(
@@ -42,22 +43,113 @@ def resolve_inputs(qe_dir, w90_dir, label_file=None):
         "Wannier90 能带数据",
     )
 
-    if label_file:
-        label_path = os.path.abspath(label_file)
-        if not os.path.exists(label_path):
-            raise FileNotFoundError(f"找不到高对称点信息文件: {label_path}")
-        return qe_band_file, w90_band_file, label_path
-
-    label_patterns = ["*_band.labelinfo.dat", "*__band.labelinfo.dat", "qe_k_lable.dat"]
+    label_patterns = ["*_band.labelinfo.dat"]
     label_path = None
-    for target_dir in (w90_dir, qe_dir):
-        try:
-            label_path = pick_file(target_dir, label_patterns, "高对称点信息")
-            break
-        except FileNotFoundError:
-            continue
+    try:
+        label_path = pick_file(w90_dir, label_patterns, "高对称点信息")
+    except FileNotFoundError:
+        label_path = pick_file(qe_dir, label_patterns, "高对称点信息")
 
     return qe_band_file, w90_band_file, label_path
+
+
+def parse_qe_plot_file(qe_band_file, b_basis, fermi_qe):
+    qe_k_dist = []
+    qe_bands = []
+
+    with open(qe_band_file, "r") as f:
+        lines = f.readlines()
+
+    header = lines[0].strip()
+    nbnd = None
+    nks = None
+    match_nbnd = re.search(r"nbnd\s*=\s*(\d+)", header)
+    match_nks = re.search(r"nks\s*=\s*(\d+)", header)
+    if match_nbnd and match_nks:
+        nbnd = int(match_nbnd.group(1))
+        nks = int(match_nks.group(1))
+    else:
+        parts = header.split()
+        if len(parts) >= 6:
+            try:
+                nbnd = int(parts[2].replace(",", ""))
+                nks = int(parts[5].replace(",", ""))
+            except ValueError:
+                nbnd = None
+                nks = None
+
+    if nbnd is None or nks is None:
+        raise ValueError(f"无法解析 QE 能带文件头部: {lines[0].strip()}")
+
+    cur_dist = 0.0
+    prev_k_cart = None
+    idx = 1
+    for _ in range(nks):
+        while idx < len(lines) and not lines[idx].strip():
+            idx += 1
+        if idx >= len(lines):
+            break
+        line_parts = lines[idx].split()
+        k_frac = np.array([float(x) for x in line_parts[:3]])
+        k_cart = k_frac @ b_basis
+        if prev_k_cart is not None:
+            cur_dist += np.linalg.norm(k_cart - prev_k_cart)
+        qe_k_dist.append(cur_dist)
+        prev_k_cart = k_cart
+
+        idx += 1
+        ebands = []
+        while len(ebands) < nbnd and idx < len(lines):
+            ebands.extend([float(x) for x in lines[idx].split()])
+            idx += 1
+        qe_bands.append(ebands)
+
+    qe_bands = np.array(qe_bands).T - fermi_qe
+    return qe_k_dist, qe_bands
+
+
+def parse_qe_gnu_file(qe_band_file, fermi_qe):
+    x_vals = []
+    y_vals = []
+    with open(qe_band_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                if x_vals:
+                    yield np.array(x_vals), np.array(y_vals) - fermi_qe
+                x_vals = []
+                y_vals = []
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            x_vals.append(float(parts[0]))
+            y_vals.append(float(parts[1]))
+    if x_vals:
+        yield np.array(x_vals), np.array(y_vals) - fermi_qe
+
+
+def parse_w90_band_file(w90_band_file, fermi_w90):
+    segments = []
+    x_vals = []
+    y_vals = []
+    with open(w90_band_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                if x_vals:
+                    segments.append((np.array(x_vals), np.array(y_vals) - fermi_w90))
+                x_vals = []
+                y_vals = []
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            x_vals.append(float(parts[0]))
+            y_vals.append(float(parts[1]))
+    if x_vals:
+        segments.append((np.array(x_vals), np.array(y_vals) - fermi_w90))
+    return segments
 
 
 def plot_comparison(qe_band_file, w90_band_file, w90_label_file, fermi_energy, output_img):
@@ -80,60 +172,36 @@ def plot_comparison(qe_band_file, w90_band_file, w90_label_file, fermi_energy, o
         print(f"Error: 找不到 Wannier90 数据文件 {w90_band_file}")
         return
 
-    # --- 2. 处理 QE 数据 (计算物理距离) ---
+    # --- 2. 处理 QE 数据 ---
     b_basis = get_recip_base(cell)
-    qe_k_dist = []
-    qe_bands = []
-
-    with open(qe_band_file, 'r') as f:
-        lines = f.readlines()
-    
-    header = lines[0].split()
-    nbnd = int(header[2].replace(',', ''))
-    nks = int(header[5])
-
-    cur_dist = 0.0
-    prev_k_cart = None
-    idx = 1
-    for _ in range(nks):
-        while idx < len(lines) and not lines[idx].strip():
-            idx += 1
-        if idx >= len(lines): break
-        line_parts = lines[idx].split()
-        k_frac = np.array([float(x) for x in line_parts[:3]])
-        k_cart = k_frac @ b_basis
-        if prev_k_cart is not None:
-            cur_dist += np.linalg.norm(k_cart - prev_k_cart)
-        qe_k_dist.append(cur_dist)
-        prev_k_cart = k_cart
-        
-        idx += 1
-        ebands = []
-        while len(ebands) < nbnd and idx < len(lines):
-            ebands.extend([float(x) for x in lines[idx].split()])
-            idx += 1
-        qe_bands.append(ebands)
-
-    qe_bands = np.array(qe_bands).T - fermi_qe
+    qe_is_gnu = qe_band_file.endswith(".gnu")
+    if qe_is_gnu:
+        qe_segments = list(parse_qe_gnu_file(qe_band_file, fermi_qe))
+    else:
+        qe_k_dist, qe_bands = parse_qe_plot_file(qe_band_file, b_basis, fermi_qe)
 
     # --- 3. 读取 Wannier90 数据 ---
-    w90_data = np.loadtxt(w90_band_file)
-    w90_k = w90_data[:, 0]
-    w90_e = w90_data[:, 1] - fermi_w90
+    w90_segments = parse_w90_band_file(w90_band_file, fermi_w90)
+    if not w90_segments:
+        raise ValueError(f"Wannier90 能带文件为空或无法解析: {w90_band_file}")
 
     # --- 4. 绘图 ---
     plt.figure(figsize=(10, 7))
 
     # 绘制 QE 能带 (红色点)
-    for i in range(nbnd):
-        label = 'DFT (QE)' if i == 0 else ""
-        plt.scatter(qe_k_dist, qe_bands[i], s=7, c='red', alpha=0.6, edgecolors='none', label=label)
+    if qe_is_gnu:
+        for idx, (x_vals, y_vals) in enumerate(qe_segments):
+            label = 'DFT (QE)' if idx == 0 else ""
+            plt.scatter(x_vals, y_vals, s=7, c='red', alpha=0.6, edgecolors='none', label=label)
+    else:
+        for i in range(len(qe_bands)):
+            label = 'DFT (QE)' if i == 0 else ""
+            plt.scatter(qe_k_dist, qe_bands[i], s=7, c='red', alpha=0.6, edgecolors='none', label=label)
 
     # 绘制 Wannier90 能带 (蓝色线)
-    nks_w90 = len(qe_k_dist) # 假设 k 点数一致
-    for i in range(0, len(w90_k), nks_w90):
-        label = 'Wannier90' if i == 0 else ""
-        plt.plot(w90_k[i:i+nks_w90], w90_e[i:i+nks_w90], 'b-', linewidth=1.5, alpha=0.8, label=label)
+    for idx, (w90_k, w90_e) in enumerate(w90_segments):
+        label = 'Wannier90' if idx == 0 else ""
+        plt.plot(w90_k, w90_e, 'b-', linewidth=1.5, alpha=0.8, label=label)
 
     # 绘制高对称点垂直线和标签
     if w90_label_file and os.path.exists(w90_label_file):
@@ -159,7 +227,10 @@ def plot_comparison(qe_band_file, w90_band_file, w90_label_file, fermi_energy, o
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys(), loc='upper right')
 
-    plt.xlim(0, max(qe_k_dist))
+    if qe_is_gnu:
+        plt.xlim(0, max(seg[0].max() for seg in qe_segments))
+    else:
+        plt.xlim(0, max(qe_k_dist))
     plt.ylim(-10, 10) # 能量显示范围
     plt.grid(True, axis='y', linestyle=':', alpha=0.4)
     
@@ -170,12 +241,11 @@ def main():
     parser = argparse.ArgumentParser(description='Compare QE and Wannier90 band structures.')
     parser.add_argument('--qe', default='.', help='QE 数据目录')
     parser.add_argument('--w90', default='.', help='Wannier90 数据目录')
-    parser.add_argument('--label', default=None, help='高对称点信息文件（可选）')
     parser.add_argument('--fermi', type=float, default=23.3313, help='Fermi energy to align (eV)')
     parser.add_argument('--out', default='band_comparison.png', help='Output image filename')
     
     args = parser.parse_args()
-    qe_band_file, w90_band_file, label_file = resolve_inputs(args.qe, args.w90, args.label)
+    qe_band_file, w90_band_file, label_file = resolve_inputs(args.qe, args.w90)
     plot_comparison(qe_band_file, w90_band_file, label_file, args.fermi, args.out)
 
 if __name__ == "__main__":

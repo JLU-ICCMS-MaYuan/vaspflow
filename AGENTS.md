@@ -6,9 +6,26 @@
 - **需求**：
     1. `wannier90_plot.py` 改为读取 `--qe/--w90` 目录并自动发现能带与高对称信息文件，默认当前目录。
     2. `qe_eband.py` 输出文件名调整：`filband` 为 `{prefix}_band`、`filproj` 为 `{prefix}_band_proj`，高对称点文件名为 `{prefix}__band.labelinfo.dat`。
+    3. `wannier90_plot.py` 的 QE 与 Wannier90 文件匹配规则与 `.gnu` 能带格式解析。
+    4. Wannier90 能带文件需按空行分段绘制，避免不同能带连线。
+    5. `wannier90_plot.py` 删除 `--label` 参数，完全依赖目录自动匹配。
 - **方案**：
     1. 新增目录内文件自动匹配逻辑与可选 `--label` 覆盖；标签文件优先从 Wannier90 目录查找，不存在则回退 QE 目录。
     2. `qe_eband.py` 生成输入文件时固定按前缀命名，并在写高对称点文件时使用新文件名。
+    3. QE 目录匹配 `*_band.gnu`，Wannier90 目录匹配 `*_band.dat`，并兼容 `&plot`/`.gnu` 两种格式的 QE 能带解析。
+    4. 解析 Wannier90 的 `*_band.dat` 时按空行拆分为单条能带并逐条绘制。
+    5. 移除 `--label` 分支，标签文件仅通过目录匹配自动发现。
+- **状态**：已完成。
+
+### [2026-01-29] QE 投影能带 kpath 距离与 Wannier90 对齐
+- **需求**：
+    1. `qe_process_eband.py` 使用 `eband.in` 的 `CELL_PARAMETERS` 计算 kpath 距离，与 Wannier90 度量一致。
+    2. 新增 `--cell` 参数（默认当前目录 `eband.in`），弃用旧的分数坐标欧氏距离算法。
+    3. 输出 `f"{prefix}_band.labelinfo.dat"` 与两列能带 `f"{prefix}_band.dat"`。
+- **方案**：
+    1. 读取 `eband.in` 的晶胞参数，构造倒格子度量矩阵并计算 `kpath_dist`。
+    2. 生成 `*_band.labelinfo.dat` 仅记录 `eband.in` 高对称点坐标与距离。
+    3. 额外输出两列能带数据文件，按能带分段写入，并统一去除 `_band_proj` 前缀用于 `*_band.dat` 与 `*_band.labelinfo.dat` 命名。
 - **状态**：已完成。
 
 ### [2026-01-22] wannier_init 复制输入结构到工作目录
