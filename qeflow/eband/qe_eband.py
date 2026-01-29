@@ -324,11 +324,19 @@ class QEEBandSetup:
             path_points = flatten_segments(segments)
             self.write_kpath_labels(segments, struct_info["lattice"], formula)
 
+            kpoint_lines = []
+            for seg_idx, segment in enumerate(segments):
+                for pt_idx, (coords, label) in enumerate(segment):
+                    is_last_point = pt_idx == len(segment) - 1
+                    is_jump = is_last_point and seg_idx < len(segments) - 1
+                    weight = 1 if is_jump else self.kpath_points
+                    kpoint_lines.append((coords, label, weight))
+
             f.write("K_POINTS crystal_b\n")
-            f.write(f"{len(path_points)}\n")
-            for coords, label in path_points:
+            f.write(f"{len(kpoint_lines)}\n")
+            for coords, label, weight in kpoint_lines:
                 f.write(
-                    f"  {coords[0]:12.8f} {coords[1]:12.8f} {coords[2]:12.8f} {self.kpath_points:6d} ! {label}\n"
+                    f"  {coords[0]:12.8f} {coords[1]:12.8f} {coords[2]:12.8f} {weight:6d} ! {label}\n"
                 )
 
         return formula
