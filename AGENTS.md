@@ -27,6 +27,7 @@
     2. 生成 `*_band.labelinfo.dat` 仅记录 `eband.in` 高对称点坐标与距离。
     3. 额外输出两列能带数据文件，按能带分段写入，并统一去除 `_band_proj` 前缀用于 `*_band.dat` 与 `*_band.labelinfo.dat` 命名。
 - **补充**：读取 `K_POINTS crystal_b` 权重，跳转点（权重=1）不计入距离，以对齐 Wannier90 的 `kpath_dist`。
+- **补充**：若 `K_POINTS` 权重与 bands 文件点数不匹配，则改用“步长突变阈值”自动识别跳转点。
 - **状态**：已完成。
 
 ### [2026-01-29] QE eband 高对称路径不连续处理

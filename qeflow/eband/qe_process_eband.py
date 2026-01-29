@@ -15,7 +15,7 @@ def is_float(text):
 
 def guess_prefix_from_filename(path):
     name = os.path.basename(path)
-    for suffix in [".projwfc_up", ".projwfc_down", ".projwfc", ".proj", ".dat"]:
+    for suffix in ["_band.projwfc_up", "_band.projwfc_down", "_band.projwfc", "_band.dat"]:
         if name.endswith(suffix):
             name = name[: -len(suffix)]
             break
@@ -175,18 +175,40 @@ def compute_kpath_dist(coords, cell, weights=None):
     dist = [0.0]
     jump_points = set()
     if weights:
-        indices = [1]
-        for i in range(1, len(weights)):
-            indices.append(indices[-1] + int(weights[i - 1]))
-        jump_indices = set(indices[i] for i in range(1, len(indices)) if weights[i - 1] == 1)
-        jump_points = set(jump_indices)
+        expected_1 = sum(weights) + 1
+        expected_2 = sum(weights)
+        if len(coords) in (expected_1, expected_2):
+            indices = [1]
+            for i in range(1, len(weights)):
+                indices.append(indices[-1] + int(weights[i - 1]))
+            jump_indices = set(indices[i] for i in range(1, len(indices)) if weights[i - 1] == 1)
+            jump_points = set(jump_indices)
+        else:
+            weights = None
 
-    for i in range(1, len(coords)):
-        if i + 1 in jump_points:
-            dist.append(dist[-1])
-            continue
-        delta = np.array(coords[i]) - np.array(coords[i - 1])
-        dist.append(dist[-1] + float(np.sqrt(delta @ metric @ delta)))
+    if not weights:
+        steps = []
+        for i in range(1, len(coords)):
+            delta = np.array(coords[i]) - np.array(coords[i - 1])
+            steps.append(float(np.sqrt(delta @ metric @ delta)))
+        nonzero_steps = [s for s in steps if s > 1.0e-10]
+        median_step = np.median(nonzero_steps) if nonzero_steps else 0.0
+        jump_threshold = median_step * 5.0 if median_step > 0 else float("inf")
+
+        for i in range(1, len(coords)):
+            delta = np.array(coords[i]) - np.array(coords[i - 1])
+            step = float(np.sqrt(delta @ metric @ delta))
+            if step > jump_threshold:
+                dist.append(dist[-1])
+                continue
+            dist.append(dist[-1] + step)
+    else:
+        for i in range(1, len(coords)):
+            if i + 1 in jump_points:
+                dist.append(dist[-1])
+                continue
+            delta = np.array(coords[i]) - np.array(coords[i - 1])
+            dist.append(dist[-1] + float(np.sqrt(delta @ metric @ delta)))
     return dist
 
 
