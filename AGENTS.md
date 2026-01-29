@@ -38,6 +38,15 @@
     3. 写 `K_POINTS crystal_b` 时，对段末点设置权重为 1 以形成跳转点。
 - **状态**：已完成。
 
+### [2026-01-29] QE 高对称路径标签文件归并
+- **需求**：
+    1. 将 `qe_process_eband.py` 中的 `*_band.labelinfo.dat` 输出移除。
+    2. `qe_eband.py` 继续输出标签文件，但重命名为 `*_gun_band.labelinfo.dat`。
+- **方案**：
+    1. 删除 `qe_process_eband.py` 的 labelinfo 写入逻辑。
+    2. `qe_eband.py` 将标签文件名改为 `_gun_band.labelinfo.dat`。
+- **状态**：已完成。
+
 ### [2026-01-22] wannier_init 复制输入结构到工作目录
 - **需求**：`-i` 指定的结构文件需拷贝到 `work_dir` 下并命名为 `POSCAR`。
 - **方案**：在 `wannier90flow/wannier_init.py` 中解析结构后，复制输入文件到 `wannier90/POSCAR`。

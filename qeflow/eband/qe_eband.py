@@ -212,7 +212,7 @@ class QEEBandSetup:
 
         total_dist = 0.0
         last_cart = None
-        label_path = os.path.join(self.work_dir, f"{prefix}_band.labelinfo.dat")
+        label_path = os.path.join(self.work_dir, f"{prefix}_gun_band.labelinfo.dat")
         with open(label_path, "w") as f:
             f.write("# label dist kx ky kz\n")
             for coords, label in label_points:

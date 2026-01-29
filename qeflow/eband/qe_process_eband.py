@@ -47,13 +47,100 @@ def orbital_from_lm(l_val, m_val):
     return f"l{l_val}m{m_val}"
 
 
-def compute_kpath_dist(coords):
+def read_cell_from_eband(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"找不到 eband.in: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    for idx, line in enumerate(lines):
+        if line.strip().upper().startswith("CELL_PARAMETERS"):
+            cell = []
+            for j in range(1, 4):
+                if idx + j >= len(lines):
+                    raise ValueError("CELL_PARAMETERS 段不完整。")
+                parts = lines[idx + j].split()
+                if len(parts) < 3:
+                    raise ValueError("CELL_PARAMETERS 行格式错误。")
+                cell.append([float(parts[0]), float(parts[1]), float(parts[2])])
+            return np.array(cell, dtype=float)
+    raise ValueError("eband.in 中未找到 CELL_PARAMETERS 段。")
+
+
+def read_kpath_points_from_eband(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"找不到 eband.in: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    kpoint_line = None
+    for idx, line in enumerate(lines):
+        if line.strip().upper().startswith("K_POINTS"):
+            kpoint_line = idx
+            break
+    if kpoint_line is None:
+        raise ValueError("eband.in 中未找到 K_POINTS 段。")
+    if "CRYSTAL_B" not in lines[kpoint_line].upper():
+        raise ValueError("K_POINTS 段不是 crystal_b 格式。")
+
+    idx = kpoint_line + 1
+    while idx < len(lines) and not lines[idx].strip():
+        idx += 1
+    if idx >= len(lines):
+        raise ValueError("K_POINTS 段缺少点数。")
+    try:
+        num_points = int(lines[idx].split()[0])
+    except ValueError as exc:
+        raise ValueError("K_POINTS 点数解析失败。") from exc
+    idx += 1
+
+    points = []
+    labels = []
+    for _ in range(num_points):
+        while idx < len(lines) and not lines[idx].strip():
+            idx += 1
+        if idx >= len(lines):
+            raise ValueError("K_POINTS 段数据不足。")
+        line = lines[idx]
+        idx += 1
+        if "!" in line:
+            coord_part, label_part = line.split("!", 1)
+            label = label_part.strip()
+        else:
+            coord_part = line
+            label = ""
+        parts = coord_part.split()
+        if len(parts) < 3:
+            raise ValueError(f"K_POINTS 行格式错误: {line}")
+        points.append([float(parts[0]), float(parts[1]), float(parts[2])])
+        labels.append(label)
+    return np.array(points, dtype=float), labels
+
+
+def get_recip_lattice(cell):
+    vol = np.dot(cell[0], np.cross(cell[1], cell[2]))
+    b1 = 2 * np.pi * np.cross(cell[1], cell[2]) / vol
+    b2 = 2 * np.pi * np.cross(cell[2], cell[0]) / vol
+    b3 = 2 * np.pi * np.cross(cell[0], cell[1]) / vol
+    return np.array([b1, b2, b3], dtype=float)
+
+
+def compute_kpath_dist(coords, cell):
+    recip = get_recip_lattice(cell)
+    metric = recip @ recip.T
     dist = [0.0]
     for i in range(1, len(coords)):
-        prev = np.array(coords[i - 1])
-        cur = np.array(coords[i])
-        dist.append(dist[-1] + float(np.linalg.norm(cur - prev)))
+        delta = np.array(coords[i]) - np.array(coords[i - 1])
+        dist.append(dist[-1] + float(np.sqrt(delta @ metric @ delta)))
     return dist
+
+
+def normalize_band_prefix(prefix):
+    if prefix.endswith("_band_proj"):
+        return prefix[: -len("_band_proj")]
+    if prefix.endswith("_proj"):
+        return prefix[: -len("_proj")]
+    return prefix
+
+
 
 
 def build_channels(labels):
@@ -275,6 +362,7 @@ def main():
     parser = argparse.ArgumentParser(description="Process QE projwfc band projections.")
     parser.add_argument("-i", "--input", required=True, help="projwfc 投影文件（如 *.projwfc_up）")
     parser.add_argument("-b", "--bandfile", default="elebanddata.dat", help="bands.x 输出文件")
+    parser.add_argument("--cell", default="eband.in", help="包含 CELL_PARAMETERS 的 eband.in")
     parser.add_argument("-o", "--output", help="输出文件名，默认 <prefix>_eleband_proj.dat")
     parser.add_argument("--prefix", help="输出文件前缀（覆盖自动推断）")
     args = parser.parse_args()
@@ -293,19 +381,24 @@ def main():
     if nk != nks_band or nbnd != nbnd_band:
         raise ValueError(f"投影文件与能带文件尺寸不一致: projwfc(nk={nk}, nbnd={nbnd}) vs bands(nk={nks_band}, nbnd={nbnd_band})")
 
-    kpath_dist = compute_kpath_dist(coords)
+    cell = read_cell_from_eband(args.cell)
+    kpath_points, kpath_labels = read_kpath_points_from_eband(args.cell)
+    kpath_dist = compute_kpath_dist(coords, cell)
     channels, group_map = build_channels(proj_labels)
     proj_index = {label: idx for idx, label in enumerate(proj_labels)}
 
     prefix = args.prefix or guess_prefix_from_filename(input_path)
     output_path = args.output or f"{prefix}_eleband_proj.dat"
     sum_output_path = f"{prefix}_eleband_proj_sum.dat"
+    band_prefix = normalize_band_prefix(prefix)
+    band_output_path = f"{band_prefix}_band.dat"
 
     col_width = max(12, max(len(name) for name in channels) if channels else 12)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(f"# source = {input_path}\n")
         f.write(f"# bands = {args.bandfile}\n")
+        f.write(f"# cell = {args.cell}\n")
         header_parts = [f"{'kpath_dist':>12}", f"{'Energy(eV)':>14}"]
         header_parts.extend(f"{name.replace('__sum',''):>{col_width}}" for name in channels)
         f.write(" ".join(header_parts) + "\n")
@@ -326,6 +419,7 @@ def main():
     with open(sum_output_path, "w", encoding="utf-8") as f:
         f.write(f"# source = {input_path}\n")
         f.write(f"# bands = {args.bandfile}\n")
+        f.write(f"# cell = {args.cell}\n")
         f.write("# summed by element and shell (e.g., Y-4s)\n")
         header_parts = [f"{'kpath_dist':>12}", f"{'Energy(eV)':>14}"]
         header_parts.extend(f"{name.replace('__sum',''):>{sum_col_width}}" for name in sum_channels)
@@ -351,8 +445,19 @@ def main():
                 f.write(row + "\n")
             f.write(f"#band={band_idx + 1}\n\n")
 
+    with open(band_output_path, "w", encoding="utf-8") as f:
+        f.write(f"# source = {args.bandfile}\n")
+        f.write(f"# cell = {args.cell}\n")
+        f.write("# kpath_dist energy\n")
+        for band_idx in range(nbnd):
+            for k_idx in range(nk):
+                energy = energies[k_idx, band_idx]
+                f.write(f"{kpath_dist[k_idx]:12.6f} {energy:14.6f}\n")
+            f.write(f"#band={band_idx + 1}\n\n")
+
     print(f"已生成投影能带数据: {output_path}")
     print(f"已生成元素汇总投影能带数据: {sum_output_path}")
+    print(f"已生成能带数据: {band_output_path}")
 
 
 if __name__ == "__main__":
