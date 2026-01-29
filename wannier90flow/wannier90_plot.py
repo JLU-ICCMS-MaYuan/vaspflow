@@ -188,15 +188,15 @@ def plot_comparison(qe_band_file, w90_band_file, w90_label_file, fermi_energy, o
     # --- 4. 绘图 ---
     plt.figure(figsize=(10, 7))
 
-    # 绘制 QE 能带 (红色点)
-    for idx, (x_vals, y_vals) in enumerate(qe_segments):
-        label = 'DFT (QE)' if idx == 0 else ""
-        plt.scatter(x_vals, y_vals, s=7, c='red', alpha=0.6, edgecolors='none', label=label)
-
-    # 绘制 Wannier90 能带 (蓝色线)
+    # 绘制 Wannier90 能带 (蓝色线，底层)
     for idx, (w90_k, w90_e) in enumerate(w90_segments):
         label = 'Wannier90' if idx == 0 else ""
-        plt.plot(w90_k, w90_e, 'b-', linewidth=1.5, alpha=0.8, label=label)
+        plt.plot(w90_k, w90_e, 'b-', linewidth=1.5, alpha=0.8, label=label, zorder=2)
+
+    # 绘制 QE 能带 (红色虚线，上层)
+    for idx, (x_vals, y_vals) in enumerate(qe_segments):
+        label = 'DFT (QE)' if idx == 0 else ""
+        plt.plot(x_vals, y_vals, 'r--', linewidth=1.2, alpha=0.8, label=label, zorder=3)
 
     # 绘制高对称点垂直线和标签
     if w90_label_file and os.path.exists(w90_label_file):
@@ -223,7 +223,9 @@ def plot_comparison(qe_band_file, w90_band_file, w90_label_file, fermi_energy, o
     plt.legend(by_label.values(), by_label.keys(), loc='upper right')
 
     plt.xlim(0, max(seg[0].max() for seg in qe_segments))
-    plt.ylim(-10, 10) # 能量显示范围
+    w90_min = min(seg[1].min() for seg in w90_segments)
+    w90_max = max(seg[1].max() for seg in w90_segments)
+    plt.ylim(w90_min, w90_max * 1.2)
     plt.grid(True, axis='y', linestyle=':', alpha=0.4)
     
     plt.savefig(output_img, dpi=300, bbox_inches='tight')
