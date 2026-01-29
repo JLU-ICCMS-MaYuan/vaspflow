@@ -142,6 +142,7 @@ def read_kpoints_weights_from_eband(path):
     idx += 1
 
     weights = []
+    points = []
     for _ in range(num_points):
         while idx < len(lines) and not lines[idx].strip():
             idx += 1
@@ -157,8 +158,29 @@ def read_kpoints_weights_from_eband(path):
             weight = int(float(parts[3]))
         except ValueError as exc:
             raise ValueError(f"K_POINTS 权重解析失败: {line}") from exc
+        points.append([float(parts[0]), float(parts[1]), float(parts[2])])
         weights.append(weight)
-    return weights
+    return np.array(points, dtype=float), weights
+
+
+def generate_klist(points, weights):
+    if len(points) != len(weights):
+        raise ValueError("K_POINTS 点与权重数量不一致。")
+    klist = []
+    jump_starts = set()
+    for i in range(len(points) - 1):
+        start = points[i]
+        end = points[i + 1]
+        num = int(weights[i])
+        if num < 1:
+            raise ValueError("K_POINTS 权重必须为正整数。")
+        if i > 0 and weights[i - 1] == 1:
+            jump_starts.add(len(klist))
+        for j in range(num):
+            frac = float(j) / float(num)
+            klist.append(start + (end - start) * frac)
+    klist.append(points[-1])
+    return np.array(klist, dtype=float), jump_starts
 
 
 def get_recip_lattice(cell):
@@ -175,16 +197,11 @@ def compute_kpath_dist(coords, cell, weights=None):
     dist = [0.0]
     jump_points = set()
     if weights:
-        expected_1 = sum(weights) + 1
-        expected_2 = sum(weights)
-        if len(coords) in (expected_1, expected_2):
-            indices = [1]
-            for i in range(1, len(weights)):
-                indices.append(indices[-1] + int(weights[i - 1]))
-            jump_indices = set(indices[i] for i in range(1, len(indices)) if weights[i - 1] == 1)
-            jump_points = set(jump_indices)
-        else:
-            weights = None
+        indices = [1]
+        for i in range(1, len(weights)):
+            indices.append(indices[-1] + int(weights[i - 1]))
+        jump_indices = set(indices[i] for i in range(1, len(indices)) if weights[i - 1] == 1)
+        jump_points = set(jump_indices)
 
     if not weights:
         steps = []
@@ -462,8 +479,11 @@ def main():
 
     cell = read_cell_from_eband(args.cell)
     kpath_points, kpath_labels = read_kpath_points_from_eband(args.cell)
-    weights = read_kpoints_weights_from_eband(args.cell)
-    kpath_dist = compute_kpath_dist(coords, cell, weights)
+    kpoints, weights = read_kpoints_weights_from_eband(args.cell)
+    klist, jump_starts = generate_klist(kpoints, weights)
+    if len(klist) != nks_band:
+        raise ValueError(f"K_POINTS 生成的 k 点数({len(klist)})与 bands 文件不一致(nks={nks_band})")
+    kpath_dist = compute_kpath_dist(klist, cell, weights)
     channels, group_map = build_channels(proj_labels)
     proj_index = {label: idx for idx, label in enumerate(proj_labels)}
 
