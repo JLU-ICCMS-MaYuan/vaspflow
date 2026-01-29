@@ -41,7 +41,7 @@ def resolve_qe_executable(bin_path, exe_name):
     return os.path.join(bin_path, exe_name)
 
 
-def parse_kpath(path):
+def parse_kpath_segments(path, tol=1.0e-6):
     points = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -62,13 +62,32 @@ def parse_kpath(path):
     if len(points) % 2 != 0:
         raise ValueError(f"KPATH.in 格式异常，点数为奇数: {len(points)}")
 
-    path_points = []
+    segments = []
     for i in range(0, len(points), 2):
         (k1, l1), (k2, l2) = points[i], points[i + 1]
-        if not path_points or path_points[-1][1] != l1 or path_points[-1][0] != k1:
-            path_points.append((k1, l1))
-        path_points.append((k2, l2))
+        if not segments:
+            segments.append([(k1, l1), (k2, l2)])
+            continue
+        prev_end = segments[-1][-1][0]
+        if (
+            abs(prev_end[0] - k1[0]) < tol
+            and abs(prev_end[1] - k1[1]) < tol
+            and abs(prev_end[2] - k1[2]) < tol
+        ):
+            segments[-1].append((k2, l2))
+        else:
+            segments.append([(k1, l1), (k2, l2)])
 
+    return segments
+
+
+def flatten_segments(segments):
+    path_points = []
+    for segment in segments:
+        for idx, (coords, label) in enumerate(segment):
+            if idx == 0 and path_points and path_points[-1][0] == coords and path_points[-1][1] == label:
+                continue
+            path_points.append((coords, label))
     return path_points
 
 
@@ -174,18 +193,29 @@ class QEEBandSetup:
         except Exception as e:
             raise RuntimeError(f"vaspkit 运行失败: {e}")
 
-    def write_kpath_labels(self, path_points, lattice, prefix):
+    def write_kpath_labels(self, segments, lattice, prefix):
         bohr_to_ang = 0.52917721092
         lattice_bohr = lattice / bohr_to_ang
         alat_bohr = float(np.linalg.norm(lattice_bohr[0]))
         # QE 的 scf.out 中倒格子以 2π/alat 为单位；此处按同一单位自算
         recip_lat = np.linalg.inv(lattice_bohr).T * alat_bohr
+
+        label_points = []
+        for seg_idx, segment in enumerate(segments):
+            if seg_idx == 0:
+                label_points.extend(segment)
+                continue
+            prev_end_coords, prev_end_label = segments[seg_idx - 1][-1]
+            replaced = [(prev_end_coords, prev_end_label)]
+            replaced.extend(segment[1:])
+            label_points.extend(replaced)
+
         total_dist = 0.0
         last_cart = None
-        label_path = os.path.join(self.work_dir, f"{prefix}__band.labelinfo.dat")
+        label_path = os.path.join(self.work_dir, f"{prefix}_band.labelinfo.dat")
         with open(label_path, "w") as f:
             f.write("# label dist kx ky kz\n")
-            for coords, label in path_points:
+            for coords, label in label_points:
                 cart = np.dot(coords, recip_lat)
                 if last_cart is not None:
                     total_dist += float(np.linalg.norm(cart - last_cart))
@@ -283,11 +313,16 @@ class QEEBandSetup:
             if not os.path.exists(kpath_path):
                 raise FileNotFoundError(f"找不到 KPATH.in: {kpath_path}")
 
-            path_points = parse_kpath(kpath_path)
-            if not path_points:
+            segments = parse_kpath_segments(kpath_path)
+            if not segments:
                 raise ValueError("KPATH.in 未解析到任何高对称点。")
 
-            self.write_kpath_labels(path_points, struct_info["lattice"], formula)
+            for idx, segment in enumerate(segments, start=1):
+                labels = "-".join(label for _coords, label in segment)
+                print(f"[kpath] segment {idx}: {labels}")
+
+            path_points = flatten_segments(segments)
+            self.write_kpath_labels(segments, struct_info["lattice"], formula)
 
             f.write("K_POINTS crystal_b\n")
             f.write(f"{len(path_points)}\n")
