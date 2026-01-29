@@ -37,6 +37,7 @@
     2. 生成路径段日志，并在标签输出时替换不连续段起点坐标/标签。
     3. 写 `K_POINTS crystal_b` 时，对段末点设置权重为 1 以形成跳转点。
     4. 额外输出 `{prefix}_band.labelinfo.dat`，包含索引列与与 Wannier90 一致的累计距离。
+    5. `{prefix}_band.labelinfo.dat` 使用 Wannier90 的 2π 倒格子度量，`*_gun_band.labelinfo.dat` 保持 QE 2π/alat。
 - **状态**：已完成。
 
 ### [2026-01-29] QE 高对称路径标签文件归并

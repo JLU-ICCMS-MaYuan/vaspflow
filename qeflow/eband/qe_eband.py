@@ -225,11 +225,14 @@ class QEEBandSetup:
                 last_cart = cart
         print(f"已生成高对称点坐标: {label_path}")
 
+    def compute_w90_recip_lattice(self, lattice):
+        volume = float(np.linalg.det(lattice))
+        if abs(volume) < 1.0e-12:
+            raise ValueError("晶胞体积过小，无法计算倒格子。")
+        return 2.0 * np.pi * np.linalg.inv(lattice).T
+
     def write_kpath_labels_with_index(self, segments, lattice, prefix, weights):
-        bohr_to_ang = 0.52917721092
-        lattice_bohr = lattice / bohr_to_ang
-        alat_bohr = float(np.linalg.norm(lattice_bohr[0]))
-        recip_lat = np.linalg.inv(lattice_bohr).T * alat_bohr
+        recip_lat = self.compute_w90_recip_lattice(lattice)
 
         label_points = []
         for seg_idx, segment in enumerate(segments):
