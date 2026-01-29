@@ -235,14 +235,11 @@ class QEEBandSetup:
         recip_lat = self.compute_w90_recip_lattice(lattice)
 
         label_points = []
+        jump_starts = []
         for seg_idx, segment in enumerate(segments):
-            if seg_idx == 0:
-                label_points.extend(segment)
-                continue
-            prev_end_coords, prev_end_label = segments[seg_idx - 1][-1]
-            replaced = [(prev_end_coords, prev_end_label)]
-            replaced.extend(segment[1:])
-            label_points.extend(replaced)
+            for pt_idx, (coords, label) in enumerate(segment):
+                label_points.append((coords, label))
+                jump_starts.append(seg_idx > 0 and pt_idx == 0)
 
         if len(label_points) != len(weights):
             raise ValueError("高对称点数量与 K_POINTS 权重数量不一致。")
@@ -255,9 +252,9 @@ class QEEBandSetup:
         last_cart = None
         label_path = os.path.join(self.work_dir, f"{prefix}_band.labelinfo.dat")
         with open(label_path, "w") as f:
-            for idx, (coords, label) in zip(indices, label_points):
+            for (idx, (coords, label), is_jump) in zip(indices, label_points, jump_starts):
                 cart = np.dot(coords, recip_lat)
-                if last_cart is not None:
+                if last_cart is not None and not is_jump:
                     total_dist += float(np.linalg.norm(cart - last_cart))
                 f.write(
                     f"{label:8} {idx:12d} {total_dist:16.10f} {coords[0]:16.10f} {coords[1]:16.10f} {coords[2]:16.10f}\n"
