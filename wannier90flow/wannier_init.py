@@ -357,6 +357,16 @@ def write_win(
         fermi_surface_plot = win_cfg.get("fermi_surface_plot", cfg.get("fermi_surface_plot"))
         if fermi_surface_plot is not None:
             f.write(f"fermi_surface_plot = {str(fermi_surface_plot).lower()}\n")
+        dos = win_cfg.get("dos", cfg.get("dos"))
+        if dos is not None:
+            f.write(f"dos = {str(dos).lower()}\n")
+        dos_kmesh = win_cfg.get("dos_kmesh", cfg.get("dos_kmesh"))
+        if dos_kmesh is not None:
+            if isinstance(dos_kmesh, (list, tuple)):
+                dos_kmesh_value = " ".join(str(int(x)) for x in dos_kmesh)
+            else:
+                dos_kmesh_value = str(dos_kmesh)
+            f.write(f"dos_kmesh = {dos_kmesh_value}\n")
 
         f.write(f"mp_grid = {' '.join(str(int(x)) for x in kpt_cfg.get('mp_grid', []))}\n")
         f.write("\n")
