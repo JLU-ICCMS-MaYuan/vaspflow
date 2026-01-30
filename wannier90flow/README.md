@@ -73,8 +73,7 @@ dos_kmesh = "25 25 25"
 dos_energy_min = 5.0
 dos_energy_max = 20.0
 dos_energy_step = 0.01
-dos_project = "1:5"
-dos_project = "6:11"
+dos_project = ["1:5", "6:11"]
 ```
 
 ### 2.5 产出文件

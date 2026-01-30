@@ -39,6 +39,7 @@ def load_post_config(path: str) -> Dict[str, Any]:
         raw_lines = f.read().splitlines()
 
     dos_projects: List[str] = []
+    dos_projects_literal = None
     out_lines: List[str] = []
     current_section = ""
     dos_section_start = None
@@ -61,7 +62,9 @@ def load_post_config(path: str) -> Dict[str, Any]:
                 if len(parts) == 2:
                     value = parts[1].split("#", 1)[0].strip()
                     if value:
-                        if value[0] in ("'", '"') and value[-1] == value[0]:
+                        if value.startswith("["):
+                            dos_projects_literal = value
+                        elif value[0] in ("'", '"') and value[-1] == value[0]:
                             dos_projects.append(value)
                         else:
                             dos_projects.append(f'"{value}"')
@@ -71,7 +74,10 @@ def load_post_config(path: str) -> Dict[str, Any]:
     if current_section == "[dos]":
         dos_section_end = len(out_lines)
 
-    if dos_projects:
+    if dos_projects_literal:
+        insert_at = dos_section_end if dos_section_end is not None else len(out_lines)
+        out_lines.insert(insert_at, f"dos_project = {dos_projects_literal}")
+    elif dos_projects:
         insert_at = dos_section_end if dos_section_end is not None else len(out_lines)
         merged = f"dos_project = [{', '.join(dos_projects)}]"
         out_lines.insert(insert_at, merged)
