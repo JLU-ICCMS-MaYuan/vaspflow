@@ -55,12 +55,12 @@ seedname = "Y1H6"
 
 ### 2.2 基本用法
 ```bash
-wannier_post -i wannier90/Y1H6.win -c inputwannier.toml
+wannier_post -i wannier90/Y1H6.win -c inputw90post.toml
 ```
 
 ### 2.3 直接执行（本地）
 ```bash
-wannier_post -i wannier90/Y1H6.win -c inputwannier.toml --run
+wannier_post -i wannier90/Y1H6.win -c inputw90post.toml --run
 ```
 
 ### 2.4 关键配置字段（示例）
@@ -68,15 +68,18 @@ wannier_post -i wannier90/Y1H6.win -c inputwannier.toml --run
 [postw90]
 executable_path = "/path/to/postw90.x"
 
-[win]
-dos = true
+[dos]
 dos_kmesh = "25 25 25"
+dos_energy_min = 5.0
+dos_energy_max = 20.0
+dos_energy_step = 0.01
 dos_project = "1:5"
+dos_project = "6:11"
 ```
 
 ### 2.5 产出文件
 - `wannier90/run_postw90.sh`
-- `wannier90/<seed>_dos.dat`（postw90 输出）
+- `wannier90/<seed>_dos_1_5.dat`（按 dos_project 重命名）
 
 ## 3. wannier_window
 

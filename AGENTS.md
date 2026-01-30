@@ -2,6 +2,17 @@
 
 ## 需求处理记录
 
+### [2026-01-30] postw90 多投影自动执行
+- **需求**：
+    1. `inputw90post.toml` 中出现多个 `dos_project` 时，循环执行多次 `postw90.x`。
+    2. 每次输出按 `seedname_dos_1_5.dat` 形式重命名，避免覆盖。
+- **方案**：
+    1. `wannier_post.py` 读取 `inputw90post.toml`，合并重复 `dos_project` 为列表。
+    2. 逐个投影写入临时 `.win`，执行 `postw90.x`，重命名输出文件。
+    3. 运行结束后恢复原始 `.win` 内容。
+    4. 新增 `tests/inputw90post.toml` 示例并更新文档。
+- **状态**：已完成。
+
 ### [2026-01-30] wannier_post 参数调整
 - **需求**：
     1. `wannier_post.py` 不再支持 `-w/-p`，改为 `-i` 指定输入文件。
