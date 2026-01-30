@@ -55,12 +55,12 @@ seedname = "Y1H6"
 
 ### 2.2 基本用法
 ```bash
-wannier_post -c inputwannier.toml
+wannier_post -i wannier90/Y1H6.win -c inputwannier.toml
 ```
 
 ### 2.3 直接执行（本地）
 ```bash
-wannier_post -c inputwannier.toml --run
+wannier_post -i wannier90/Y1H6.win -c inputwannier.toml --run
 ```
 
 ### 2.4 关键配置字段（示例）
