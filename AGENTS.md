@@ -49,7 +49,7 @@
 
 ### [2026-02-07] vasp_charge EINT 数组写入格式
 - **需求**：`EINT = [8, 16.6861]` 读入后写为 `EINT = 8 16.6861`。
-- **方案**：在 `vasp_charge.py` 中对 `charge_params.EINT` 做数组转空格字符串的处理。
+- **方案**：在 `vasp_charge.py` 中对 `incar_params.EINT` 做数组转空格字符串的处理，并移除 `charge_params` 读取。
 - **状态**：已完成。
 
 ### [2026-01-30] postw90 多投影自动执行

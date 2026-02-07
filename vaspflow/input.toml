@@ -44,13 +44,3 @@ NGZ = 80
 NGXF = 160
 NGYF = 160
 NGZF = 160
-
-[charge_params]
-# 能量范围参数需按需填写；不设置则不写入 INCAR
-EINT = "-12 8.925242"
-NGX = 80
-NGY = 80
-NGZ = 80
-NGXF = 160
-NGYF = 160
-NGZF = 160

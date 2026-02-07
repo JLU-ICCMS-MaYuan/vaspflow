@@ -61,15 +61,13 @@ class VaspChargeSetup:
         """生成 INCAR 文件"""
         final_params = self.incar_template.copy()
 
-        # 优先级: [charge_params] > [incar_params] > 默认模板
+        # 优先级: [incar_params] > 默认模板
         if "incar_params" in self.config:
-            final_params.update(self.config["incar_params"])
-        if "charge_params" in self.config:
-            charge_params = self.config["charge_params"].copy()
-            eint_value = charge_params.get("EINT")
+            incar_params = self.config["incar_params"].copy()
+            eint_value = incar_params.get("EINT")
             if isinstance(eint_value, list):
-                charge_params["EINT"] = " ".join(str(item) for item in eint_value)
-            final_params.update(charge_params)
+                incar_params["EINT"] = " ".join(str(item) for item in eint_value)
+            final_params.update(incar_params)
 
         print("正在生成 INCAR (Charge)...")
         incar_path = os.path.join(self.work_dir, "INCAR")
