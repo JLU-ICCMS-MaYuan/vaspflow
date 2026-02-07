@@ -2,6 +2,28 @@
 
 ## 需求处理记录
 
+### [2026-02-07] vaspflow skill（locpot 工作流）
+- **需求**：
+    1. 设计通用 vaspflow 技能，适配新增 `vasp_locpot` 子功能。
+    2. 目录结构与脚本骨架对齐 `vaspflow/scf`。
+    3. 明确配置字段、输出文件与命令入口规范。
+- **方案**：
+    1. 在 `skills/vaspflow/` 创建 `SKILL.md`。
+    2. 定义目录模板、脚本方法清单、locpot 关键参数建议。
+    3. 说明 input.toml 配置字段与输出规范。
+- **状态**：已完成。
+
+### [2026-02-07] vaspflow 概览 PPT
+- **需求**：
+    1. 基于 `vaspflow` 代码生成面向新入组学生的中文概览 PPT。
+    2. 覆盖整体结构、模块职责、配置文件与运行方式。
+    3. 输出放在 `vaspflow/` 目录下。
+- **方案**：
+    1. 读取 `vaspflow` 目录结构与各模块脚本概要。
+    2. 按模块与通用流程组织 10+ 张 slides。
+    3. 生成 `vaspflow_overview.pptx`。
+- **状态**：已完成。
+
 ### [2026-01-30] postw90 多投影自动执行
 - **需求**：
     1. `inputw90post.toml` 中出现多个 `dos_project` 时，循环执行多次 `postw90.x`。
