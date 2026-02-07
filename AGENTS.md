@@ -52,6 +52,11 @@
 - **方案**：在 `vasp_charge.py` 中对 `incar_params.EINT` 做数组转空格字符串的处理，并移除 `charge_params` 读取。
 - **状态**：已完成。
 
+### [2026-02-07] vasp_charge 目录名按 EINT
+- **需求**：根据 `EINT = [emin, emax]` 自动设置工作目录为 `vasp_charge___emin___emax`。
+- **方案**：在 `vasp_charge.py` 初始化阶段读取 `incar_params.EINT`，若为数组则更新 `work_dir`。
+- **状态**：已完成。
+
 ### [2026-01-30] postw90 多投影自动执行
 - **需求**：
     1. `inputw90post.toml` 中出现多个 `dos_project` 时，循环执行多次 `postw90.x`。
