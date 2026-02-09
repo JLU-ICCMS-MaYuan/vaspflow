@@ -54,7 +54,7 @@
 
 ### [2026-02-07] vasp_charge 目录名按 EINT
 - **需求**：根据 `EINT = [emin, emax]` 自动设置工作目录为 `vasp_charge___emin___emax`。
-- **方案**：在 `vasp_charge.py` 初始化阶段读取 `incar_params.EINT`，若为数组则更新 `work_dir`。
+- **方案**：在 `vasp_charge.py` 初始化阶段读取 `incar_params.EINT`，若为数组则按三位小数格式更新 `work_dir`。
 - **状态**：已完成。
 
 ### [2026-01-30] postw90 多投影自动执行

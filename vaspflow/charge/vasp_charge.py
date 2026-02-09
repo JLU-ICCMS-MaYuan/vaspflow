@@ -32,7 +32,7 @@ class VaspChargeSetup:
         incar_params = self.config.get("incar_params", {})
         eint_value = incar_params.get("EINT")
         if isinstance(eint_value, list) and len(eint_value) >= 2:
-            self.work_dir = f"vasp_charge___{eint_value[0]}___{eint_value[1]}"
+            self.work_dir = f"vasp_charge___{float(eint_value[0]):.3f}___{float(eint_value[1]):.3f}"
 
         # 默认 INCAR 模板 (能量范围电荷密度)
         self.incar_template = {
