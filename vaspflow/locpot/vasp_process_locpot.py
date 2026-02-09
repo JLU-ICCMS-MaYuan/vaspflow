@@ -299,14 +299,6 @@ def main():
     locpot_path = args.locpot_path or "LOCPOT"
     lattice_L, grid_L, V = read_vasp_volumetric(locpot_path)
     chg_paths = args.chg
-    if chg_paths is None:
-        chg_paths = []
-        if os.path.exists("PARCHG"):
-            chg_paths.append("PARCHG")
-        if os.path.exists("CHGCAR"):
-            chg_paths.append("CHGCAR")
-    if not chg_paths:
-        raise FileNotFoundError("未指定 --chg，且当前目录未找到 PARCHG/CHGCAR。")
 
     rho_list = []
     rho_labels = []
@@ -323,7 +315,7 @@ def main():
         rho_list.append(rho)
         rho_labels.append(chg_path)
 
-    if not rho_list:
+    if chg_paths and not rho_list:
         raise FileNotFoundError("没有可用的电荷密度文件，请检查 --chg 输入。")
     grid = grid_L
 
@@ -365,10 +357,13 @@ def main():
 
     out_dat = f"{args.out_prefix}.dat"
     header = "s(Angstrom)\tV_locpot(eV)"
+    data_cols = [s, V_line]
     for label in rho_labels:
         safe_label = label.replace("\t", " ")
         header += f"\trho({safe_label})"
-    data_out = np.column_stack([s, V_line, *rho_lines])
+    if rho_lines:
+        data_cols.extend(rho_lines)
+    data_out = np.column_stack(data_cols)
     np.savetxt(out_dat, data_out, header=header, delimiter="\t", fmt="%.10e")
 
     try:
@@ -380,19 +375,21 @@ def main():
         return
 
     fig, ax1 = plt.subplots(figsize=(8, 4.8))
-    color_v = "tab:blue"
+    color_v = "black"
     ax1.plot(s, V_line, label="V (LOCPOT)", color=color_v)
     ax1.set_xlabel("s (Å) along path")
     ax1.set_ylabel("V (eV)", color=color_v)
     ax1.tick_params(axis="y", labelcolor=color_v)
     ax1.grid(True)
-    ax2 = ax1.twinx()
-    colors = plt.rcParams.get("axes.prop_cycle", None)
-    color_list = colors.by_key().get("color", []) if colors is not None else []
-    for idx, (rho_line, label) in enumerate(zip(rho_lines, rho_labels)):
-        color = color_list[idx % len(color_list)] if color_list else None
-        ax2.plot(s, rho_line, label=label, color=color)
-    ax2.set_ylabel(f"Density ({rho_unit})")
+    ax2 = None
+    if rho_lines:
+        ax2 = ax1.twinx()
+        colors = plt.rcParams.get("axes.prop_cycle", None)
+        color_list = colors.by_key().get("color", []) if colors is not None else []
+        for idx, (rho_line, label) in enumerate(zip(rho_lines, rho_labels)):
+            color = color_list[idx % len(color_list)] if color_list else None
+            ax2.plot(s, rho_line, label=label, color=color)
+        ax2.set_ylabel(f"Density ({rho_unit})")
 
     for s_i, lab in zip(s_vertices, labels):
         ax1.axvline(s_i, color="0.5", linestyle="--", linewidth=1, alpha=0.7)
@@ -409,8 +406,11 @@ def main():
         )
 
     h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc="best")
+    if ax2 is not None:
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax1.legend(h1 + h2, l1 + l2, loc="best")
+    else:
+        ax1.legend(h1, l1, loc="best")
 
     out_png = f"{args.out_prefix}.png"
     plt.tight_layout()
