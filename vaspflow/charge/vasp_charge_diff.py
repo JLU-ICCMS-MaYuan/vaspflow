@@ -95,7 +95,7 @@ def _write_vasp_charge(path, header, coords, grid, data):
             f.write(line if line.endswith("\n") else line + "\n")
         f.write(f"{ngx} {ngy} {ngz}\n")
         for i, value in enumerate(data, start=1):
-            f.write(f"{value:16.10E}")
+            f.write(f" {value:16.10E}")
             if i % 5 == 0:
                 f.write("\n")
         if len(data) % 5 != 0:
