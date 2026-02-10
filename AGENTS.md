@@ -32,6 +32,17 @@
 - **方案**：仅在 `--chg` 非空时迭代读取电荷密度文件。
 - **状态**：已完成。
 
+### [2026-02-09] vasp_opt 结构优化脚本
+- **需求**：
+    1. 新增结构优化脚本，支持 rv4/rv1/rvf 三种模式。
+    2. 生成对应 INCAR 与 Slurm 脚本，工作目录为 `vasp_opt`。
+    3. 注册脚本入口。
+- **方案**：
+    1. 新增 `vaspflow/opt/vasp_opt.py` 与 `__init__.py`。
+    2. 按模板生成 INCAR_1~4 与 `fouropt.sh/oneopt.sh/fopt.sh`。
+    3. 在 `pyproject.toml` 中注册 `vasp_opt` 入口。
+- **状态**：已完成。
+
 ### [2026-02-09] vasp_process_locpot 多点剖面分析
 - **需求**：
     1. 支持多点路径抽样 LOCPOT/PARCHG/CHGCAR 的 1D 剖面。
