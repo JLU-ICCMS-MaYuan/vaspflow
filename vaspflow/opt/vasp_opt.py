@@ -16,8 +16,8 @@ except ImportError:
 
 
 class VaspOptSetup:
-    def __init__(self, config_file="input.toml", struct_file=None):
-        self.work_dir = "vasp_opt"
+    def __init__(self, config_file="input.toml", struct_file=None, pressure_override=None, work_dir="vasp_opt"):
+        self.work_dir = work_dir
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"找不到配置文件: {config_file}")
         if "tomllib" in globals():
@@ -27,12 +27,21 @@ class VaspOptSetup:
             self.config = toml.load(config_file)
         self.struct_file = struct_file
         self.incar_params = self._load_incar_params()
+        self.pstress_value = self._resolve_pstress(pressure_override)
 
     def _load_incar_params(self):
         incar_params = self.config.get("incar_params")
         if not incar_params:
             raise ValueError("配置缺少 [incar_params] 块")
         return incar_params
+
+    def _resolve_pstress(self, pressure_override):
+        if pressure_override is not None:
+            return pressure_override
+        pstress = self.incar_params.get("PSTRESS")
+        if pstress is None:
+            raise ValueError("缺少 PSTRESS，且未通过 -p 指定")
+        return pstress
 
     def _write_incar(self, filepath, lines):
         with open(filepath, "w") as incar:
@@ -92,7 +101,7 @@ class VaspOptSetup:
             "POTIM    = 0.3",
             "LWAVE  = .FALSE.",
             "LCHARG = .FALSE.",
-            f"PSTRESS  = {float(self.incar_params['PSTRESS'])}",
+            f"PSTRESS  = {float(self.pstress_value)}",
         ]
         self._write_incar(incar_filepath, lines)
         return incar_filepath
@@ -120,7 +129,7 @@ class VaspOptSetup:
             "POTIM    = 0.1",
             "LWAVE  = .FALSE.",
             "LCHARG = .FALSE.",
-            f"PSTRESS  = {float(self.incar_params['PSTRESS'])}",
+            f"PSTRESS  = {float(self.pstress_value)}",
         ]
         self._write_incar(incar_filepath, lines)
         return incar_filepath
@@ -148,7 +157,7 @@ class VaspOptSetup:
             "POTIM    = 0.05",
             "LWAVE    = .FALSE.",
             "LCHARG   = .FALSE.",
-            f"PSTRESS  = {float(self.incar_params['PSTRESS'])}",
+            f"PSTRESS  = {float(self.pstress_value)}",
         ]
         self._write_incar(incar_filepath, lines)
         return incar_filepath
@@ -188,7 +197,7 @@ class VaspOptSetup:
             f"POTIM    = {self.incar_params['POTIM']}",
             "LWAVE  = .FALSE.",
             "LCHARG = .FALSE.",
-            f"PSTRESS  = {float(self.incar_params['PSTRESS'])}",
+            f"PSTRESS  = {float(self.pstress_value)}",
         ])
         self._write_incar(incar_filepath, lines)
         return incar_filepath
@@ -313,9 +322,18 @@ def main():
     parser.add_argument("-i", "--input", help="输入结构文件 (将被拷贝为 POSCAR)")
     parser.add_argument("-c", "--config", default="input.toml", help="配置文件路径 (默认为 input.toml)")
     parser.add_argument("--mode", choices=["rv4", "rv1", "rvf"], default="rv4", help="优化模式")
+    parser.add_argument("-p", "--pressure", type=int, help="覆盖 PSTRESS (整数)")
     args = parser.parse_args()
 
-    setup = VaspOptSetup(config_file=args.config, struct_file=args.input)
+    work_dir = "vasp_opt"
+    if args.pressure is not None:
+        work_dir = os.path.join(str(args.pressure), "vasp_opt")
+    setup = VaspOptSetup(
+        config_file=args.config,
+        struct_file=args.input,
+        pressure_override=args.pressure,
+        work_dir=work_dir,
+    )
     setup.run(mode=args.mode)
 
 

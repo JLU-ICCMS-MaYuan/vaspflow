@@ -68,6 +68,11 @@
 - **方案**：按 POSCAR 元素顺序从 `potcar_dir` 合并写入 `vasp_opt/POTCAR`。
 - **状态**：已完成。
 
+### [2026-02-10] vasp_opt 支持 -p 覆盖 PSTRESS
+- **需求**：增加 `-p` 参数覆盖 `PSTRESS`，并按压力目录创建 `vasp_opt`。
+- **方案**：`-p` 为整数时将目录设为 `{p}/vasp_opt`，未指定则使用 `PSTRESS` 并在 `vasp_opt` 创建。
+- **状态**：已完成。
+
 ### [2026-02-09] vasp_process_locpot 多点剖面分析
 - **需求**：
     1. 支持多点路径抽样 LOCPOT/PARCHG/CHGCAR 的 1D 剖面。
