@@ -139,8 +139,13 @@ class VaspOptSetup:
             lines.append(f"NCORE  = {self.incar_params['NCORE']}")
         if self.incar_params.get("KPAR") is not None:
             lines.append(f"KPAR   = {self.incar_params['KPAR']}")
+        kspacing = self.incar_params.get("KSPACING")
+        if kspacing is None:
+            kspacing = self.config.get("kmesh")
+        if kspacing is None:
+            raise ValueError("缺少 KSPACING 且未设置 kmesh")
         lines.extend([
-            f"KSPACING = {self.incar_params['KSPACING']}",
+            f"KSPACING = {kspacing}",
             f"ISMEAR   = {self.incar_params['ISMEAR']}",
             f"SIGMA    = {self.incar_params['SIGMA']}",
             f"NELM     = {self.incar_params['NELM']}",

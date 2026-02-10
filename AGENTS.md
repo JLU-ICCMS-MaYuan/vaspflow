@@ -53,6 +53,11 @@
 - **方案**：`vasp_opt` 仅读取 `[incar_params]` 生成 rv4 最后一步与 rv1/rvf 的 INCAR。
 - **状态**：已完成。
 
+### [2026-02-10] vasp_opt KSPACING 由 kmesh 兜底
+- **需求**：`KSPACING` 未配置时使用顶层 `kmesh`。
+- **方案**：`incar_params` 缺少 `KSPACING` 时读取 `kmesh` 写入 INCAR。
+- **状态**：已完成。
+
 ### [2026-02-09] vasp_process_locpot 多点剖面分析
 - **需求**：
     1. 支持多点路径抽样 LOCPOT/PARCHG/CHGCAR 的 1D 剖面。
