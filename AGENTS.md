@@ -73,6 +73,11 @@
 - **方案**：`-p` 为整数时将目录设为 `{p}/vasp_opt`，未指定则使用 `PSTRESS` 并在 `vasp_opt` 创建。
 - **状态**：已完成。
 
+### [2026-02-10] vasp_opt 执行命令简化
+- **需求**：运行命令仅使用 `vasp_execmd`，不再附加 `vasp_std`。
+- **方案**：更新 rv4/rv1/rvf 脚本中的执行行。
+- **状态**：已完成。
+
 ### [2026-02-09] vasp_process_locpot 多点剖面分析
 - **需求**：
     1. 支持多点路径抽样 LOCPOT/PARCHG/CHGCAR 的 1D 剖面。

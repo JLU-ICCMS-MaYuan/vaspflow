@@ -221,14 +221,13 @@ class VaspOptSetup:
         jobname = "fouropt.sh"
         submit_script_filepath = os.path.join(submit_dirpath, jobname)
         vasp_execmd = self._get_vasp_execmd()
-        vaspstd_path = "vasp_std"
         with open(submit_script_filepath, "w") as submit:
             self._write_job_header(submit)
             submit.write("for i in {1..4}; do                  \n")
             submit.write("cp INCAR_$i INCAR                    \n")
             submit.write("killall -9 vasp_std                  \n")
             submit.write("sleep 3                              \n")
-            submit.write(f"{vasp_execmd} {vaspstd_path} > vasp.log_$i 2>&1             \n")
+            submit.write(f"{vasp_execmd} > vasp.log_$i 2>&1             \n")
             submit.write("cp CONTCAR CONTCAR_$i                \n")
             submit.write("cp OUTCAR  OUTCAR_$i                 \n")
             submit.write("cp CONTCAR POSCAR                    \n")
@@ -240,10 +239,9 @@ class VaspOptSetup:
         jobname = "oneopt.sh"
         submit_script_filepath = os.path.join(submit_dirpath, jobname)
         vasp_execmd = self._get_vasp_execmd()
-        vaspstd_path = "vasp_std"
         with open(submit_script_filepath, "w") as submit:
             self._write_job_header(submit)
-            submit.write(f"{vasp_execmd} {vaspstd_path} > vasp.log 2>&1               \n")
+            submit.write(f"{vasp_execmd} > vasp.log 2>&1               \n")
             submit.write("cp CONTCAR POSCAR\n")
         os.chmod(submit_script_filepath, 0o755)
         return jobname
@@ -252,7 +250,6 @@ class VaspOptSetup:
         jobname = "fopt.sh"
         submit_script_filepath = os.path.join(submit_dirpath, jobname)
         vasp_execmd = self._get_vasp_execmd()
-        vaspstd_path = "vasp_std"
         with open(submit_script_filepath, "w") as submit:
             self._write_job_header(submit)
             submit.write("num=0                                         \n")
@@ -261,7 +258,7 @@ class VaspOptSetup:
             submit.write("        echo \"run fine vasp opt-$num\"         \n")
             submit.write("        killall -9 vasp_std                                \n")
             submit.write("        sleep 3                                            \n")
-            submit.write(f"        timeout 14400s {vasp_execmd} {vaspstd_path} > vasp.log 2>&1               \n")
+            submit.write(f"        timeout 14400s {vasp_execmd} > vasp.log 2>&1               \n")
             submit.write("        cp -f CONTCAR CONTCAR-fine &&  cp -f CONTCAR POSCAR\n")
             submit.write("        rows=`sed -n '/F\=/p' OSZICAR | wc -l`             \n")
             submit.write("        echo \"rows-$rows\"                                  \n")
